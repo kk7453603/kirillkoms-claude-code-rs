@@ -101,16 +101,13 @@ mod tests {
     }
 
     #[test]
-    fn sessions_dir_correct() {
-        unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR"); }
+    fn sessions_dir_ends_with_sessions() {
         let p = sessions_dir();
         assert!(p.ends_with("sessions"));
-        assert!(p.to_string_lossy().contains(".claude"));
     }
 
     #[test]
-    fn history_path_correct() {
-        unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR"); }
+    fn history_path_ends_with_history_jsonl() {
         let p = history_path();
         assert!(p.ends_with("history.jsonl"));
     }

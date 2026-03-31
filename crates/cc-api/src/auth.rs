@@ -100,15 +100,15 @@ mod tests {
     // Helper to safely set/remove env vars in tests.
     // SAFETY: These tests must be run with --test-threads=1 to avoid races.
     unsafe fn set_env(key: &str, val: &str) {
-        std::env::set_var(key, val);
+        unsafe { std::env::set_var(key, val) };
     }
     unsafe fn remove_env(key: &str) {
-        std::env::remove_var(key);
+        unsafe { std::env::remove_var(key) };
     }
     unsafe fn restore_env(key: &str, saved: Option<String>) {
         match saved {
-            Some(v) => std::env::set_var(key, v),
-            None => std::env::remove_var(key),
+            Some(v) => unsafe { std::env::set_var(key, v) },
+            None => unsafe { std::env::remove_var(key) },
         }
     }
 
