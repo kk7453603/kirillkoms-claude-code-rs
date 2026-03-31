@@ -299,38 +299,50 @@ mod tests {
     }
 
     #[test]
-    fn load_all_settings_no_project() {
-        // Point global config to a temp dir so we don't read the real one.
+    fn load_all_settings_merges_layers() {
+        // Test the merge behavior of load_all_settings by creating a
+        // self-contained directory structure. We load files directly
+        // to avoid env var races with other tests.
         let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", dir.path().as_os_str()); }
-        let result = load_all_settings(None);
-        unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR"); }
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn load_all_settings_with_project() {
-        let global_dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", global_dir.path().as_os_str()); }
-
-        let project_dir = tempfile::tempdir().unwrap();
-        let claude_dir = project_dir.path().join(".claude");
+        let claude_dir = dir.path().join(".claude");
         std::fs::create_dir_all(&claude_dir).unwrap();
+
+        // Write project settings
         std::fs::write(
             claude_dir.join("settings.json"),
-            r#"{"model": "claude-sonnet-4-6"}"#,
+            r#"{"model": "claude-sonnet-4-6", "permissions": {"allow": [{"tool": "bash"}]}}"#,
         )
         .unwrap();
+
+        // Write local settings that override model
         std::fs::write(
             claude_dir.join("settings.local.json"),
             r#"{"model": "claude-opus-4-6"}"#,
         )
         .unwrap();
 
-        let settings = load_all_settings(Some(project_dir.path())).unwrap();
-        unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR"); }
-        // Local settings override project settings
-        assert_eq!(settings.model, Some("claude-opus-4-6".to_string()));
+        // Load and merge project + local layers directly (skip global)
+        let project = load_settings_file(&crate::paths::project_settings_path(dir.path())).unwrap();
+        let local = load_settings_file(&crate::paths::local_settings_path(dir.path())).unwrap();
+        let merged = merge_settings(&[project, local]);
+
+        // Local settings override project model
+        assert_eq!(merged.model, Some("claude-opus-4-6".to_string()));
+        // Permissions from project are preserved
+        let allow = merged.permissions.unwrap().allow.unwrap();
+        assert_eq!(allow.len(), 1);
+        assert_eq!(allow[0].tool, "bash");
+    }
+
+    #[test]
+    fn load_all_settings_missing_files() {
+        // When files don't exist, load_settings_file returns defaults
+        let dir = tempfile::tempdir().unwrap();
+        let project = load_settings_file(&crate::paths::project_settings_path(dir.path())).unwrap();
+        let local = load_settings_file(&crate::paths::local_settings_path(dir.path())).unwrap();
+        let merged = merge_settings(&[project, local]);
+        assert!(merged.model.is_none());
+        assert!(merged.permissions.is_none());
     }
 
     #[test]

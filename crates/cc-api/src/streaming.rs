@@ -130,7 +130,7 @@ impl StreamAccumulator {
                     }
                     ContentDelta::SignatureDelta { signature } => {
                         if let Some(ContentBlock::Thinking {
-                            signature: ref mut s,
+                            signature: s,
                             ..
                         }) = self.content_blocks.get_mut(*index)
                         {
