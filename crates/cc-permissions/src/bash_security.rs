@@ -280,7 +280,8 @@ fn describe_command(
     is_destructive: bool,
     is_network: bool,
 ) -> String {
-    let first = first_command(&cmd.to_lowercase());
+    let lower_cmd = cmd.to_lowercase();
+    let first = first_command(&lower_cmd);
     let mut parts = Vec::new();
 
     if is_destructive {
