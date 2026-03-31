@@ -59,8 +59,8 @@ impl PermissionRule {
             return true;
         }
 
-        // Glob-style matching: support * at the end or beginning
-        if self.tool_name.contains('*') {
+        // Glob-style matching: support wildcards (* and ?)
+        if self.tool_name.contains('*') || self.tool_name.contains('?') {
             if let Ok(glob) = globset::Glob::new(&self.tool_name) {
                 let matcher = glob.compile_matcher();
                 return matcher.is_match(tool_name);

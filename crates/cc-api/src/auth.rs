@@ -97,181 +97,150 @@ mod tests {
         assert_eq!(value, "Bearer oauth-token-123");
     }
 
+    // Helper to safely set/remove env vars in tests.
+    // SAFETY: These tests must be run with --test-threads=1 to avoid races.
+    unsafe fn set_env(key: &str, val: &str) {
+        std::env::set_var(key, val);
+    }
+    unsafe fn remove_env(key: &str) {
+        std::env::remove_var(key);
+    }
+    unsafe fn restore_env(key: &str, saved: Option<String>) {
+        match saved {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        }
+    }
+
     #[test]
     fn from_env_with_api_key() {
-        // Save and restore env vars
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
-        let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
-        let saved_url = std::env::var("ANTHROPIC_BASE_URL").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
+            let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
+            let saved_url = std::env::var("ANTHROPIC_BASE_URL").ok();
 
-        std::env::set_var("ANTHROPIC_API_KEY", "sk-env-test");
-        std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
-        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
-        std::env::remove_var("ANTHROPIC_BASE_URL");
+            set_env("ANTHROPIC_API_KEY", "sk-env-test");
+            remove_env("ANTHROPIC_AUTH_TOKEN");
+            remove_env("CLAUDE_CODE_OAUTH_TOKEN");
+            remove_env("ANTHROPIC_BASE_URL");
 
-        let config = ApiConfig::from_env().unwrap();
-        match &config.auth {
-            AuthMethod::ApiKey(k) => assert_eq!(k, "sk-env-test"),
-            _ => panic!("expected ApiKey"),
-        }
-        assert_eq!(config.base_url, "https://api.anthropic.com");
+            let config = ApiConfig::from_env().unwrap();
+            match &config.auth {
+                AuthMethod::ApiKey(k) => assert_eq!(k, "sk-env-test"),
+                _ => panic!("expected ApiKey"),
+            }
+            assert_eq!(config.base_url, "https://api.anthropic.com");
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_token {
-            Some(v) => std::env::set_var("ANTHROPIC_AUTH_TOKEN", v),
-            None => std::env::remove_var("ANTHROPIC_AUTH_TOKEN"),
-        }
-        match saved_oauth {
-            Some(v) => std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", v),
-            None => std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN"),
-        }
-        match saved_url {
-            Some(v) => std::env::set_var("ANTHROPIC_BASE_URL", v),
-            None => std::env::remove_var("ANTHROPIC_BASE_URL"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_AUTH_TOKEN", saved_token);
+            restore_env("CLAUDE_CODE_OAUTH_TOKEN", saved_oauth);
+            restore_env("ANTHROPIC_BASE_URL", saved_url);
         }
     }
 
     #[test]
     fn from_env_with_oauth_token() {
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
-        let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
+            let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::set_var("ANTHROPIC_AUTH_TOKEN", "oauth-env-test");
-        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+            remove_env("ANTHROPIC_API_KEY");
+            set_env("ANTHROPIC_AUTH_TOKEN", "oauth-env-test");
+            remove_env("CLAUDE_CODE_OAUTH_TOKEN");
 
-        let config = ApiConfig::from_env().unwrap();
-        match &config.auth {
-            AuthMethod::OAuthToken(t) => assert_eq!(t, "oauth-env-test"),
-            _ => panic!("expected OAuthToken"),
-        }
+            let config = ApiConfig::from_env().unwrap();
+            match &config.auth {
+                AuthMethod::OAuthToken(t) => assert_eq!(t, "oauth-env-test"),
+                _ => panic!("expected OAuthToken"),
+            }
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_token {
-            Some(v) => std::env::set_var("ANTHROPIC_AUTH_TOKEN", v),
-            None => std::env::remove_var("ANTHROPIC_AUTH_TOKEN"),
-        }
-        match saved_oauth {
-            Some(v) => std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", v),
-            None => std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_AUTH_TOKEN", saved_token);
+            restore_env("CLAUDE_CODE_OAUTH_TOKEN", saved_oauth);
         }
     }
 
     #[test]
     fn from_env_with_claude_code_oauth_token() {
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
-        let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
+            let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
-        std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", "cc-oauth-test");
+            remove_env("ANTHROPIC_API_KEY");
+            remove_env("ANTHROPIC_AUTH_TOKEN");
+            set_env("CLAUDE_CODE_OAUTH_TOKEN", "cc-oauth-test");
 
-        let config = ApiConfig::from_env().unwrap();
-        match &config.auth {
-            AuthMethod::OAuthToken(t) => assert_eq!(t, "cc-oauth-test"),
-            _ => panic!("expected OAuthToken"),
-        }
+            let config = ApiConfig::from_env().unwrap();
+            match &config.auth {
+                AuthMethod::OAuthToken(t) => assert_eq!(t, "cc-oauth-test"),
+                _ => panic!("expected OAuthToken"),
+            }
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_token {
-            Some(v) => std::env::set_var("ANTHROPIC_AUTH_TOKEN", v),
-            None => std::env::remove_var("ANTHROPIC_AUTH_TOKEN"),
-        }
-        match saved_oauth {
-            Some(v) => std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", v),
-            None => std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_AUTH_TOKEN", saved_token);
+            restore_env("CLAUDE_CODE_OAUTH_TOKEN", saved_oauth);
         }
     }
 
     #[test]
     fn from_env_no_credentials() {
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
-        let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
+            let saved_oauth = std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok();
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("ANTHROPIC_AUTH_TOKEN");
-        std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN");
+            remove_env("ANTHROPIC_API_KEY");
+            remove_env("ANTHROPIC_AUTH_TOKEN");
+            remove_env("CLAUDE_CODE_OAUTH_TOKEN");
 
-        let result = ApiConfig::from_env();
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, ApiError::AuthError { .. }));
+            let result = ApiConfig::from_env();
+            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert!(matches!(err, ApiError::AuthError { .. }));
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_token {
-            Some(v) => std::env::set_var("ANTHROPIC_AUTH_TOKEN", v),
-            None => std::env::remove_var("ANTHROPIC_AUTH_TOKEN"),
-        }
-        match saved_oauth {
-            Some(v) => std::env::set_var("CLAUDE_CODE_OAUTH_TOKEN", v),
-            None => std::env::remove_var("CLAUDE_CODE_OAUTH_TOKEN"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_AUTH_TOKEN", saved_token);
+            restore_env("CLAUDE_CODE_OAUTH_TOKEN", saved_oauth);
         }
     }
 
     #[test]
     fn from_env_custom_base_url() {
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_url = std::env::var("ANTHROPIC_BASE_URL").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_url = std::env::var("ANTHROPIC_BASE_URL").ok();
 
-        std::env::set_var("ANTHROPIC_API_KEY", "sk-test");
-        std::env::set_var("ANTHROPIC_BASE_URL", "https://custom.api.com");
+            set_env("ANTHROPIC_API_KEY", "sk-test");
+            set_env("ANTHROPIC_BASE_URL", "https://custom.api.com");
 
-        let config = ApiConfig::from_env().unwrap();
-        assert_eq!(config.base_url, "https://custom.api.com");
+            let config = ApiConfig::from_env().unwrap();
+            assert_eq!(config.base_url, "https://custom.api.com");
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_url {
-            Some(v) => std::env::set_var("ANTHROPIC_BASE_URL", v),
-            None => std::env::remove_var("ANTHROPIC_BASE_URL"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_BASE_URL", saved_url);
         }
     }
 
     #[test]
     fn api_key_takes_precedence_over_oauth() {
-        let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
-        let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
+        unsafe {
+            let saved_key = std::env::var("ANTHROPIC_API_KEY").ok();
+            let saved_token = std::env::var("ANTHROPIC_AUTH_TOKEN").ok();
 
-        std::env::set_var("ANTHROPIC_API_KEY", "sk-key");
-        std::env::set_var("ANTHROPIC_AUTH_TOKEN", "oauth-token");
+            set_env("ANTHROPIC_API_KEY", "sk-key");
+            set_env("ANTHROPIC_AUTH_TOKEN", "oauth-token");
 
-        let config = ApiConfig::from_env().unwrap();
-        match &config.auth {
-            AuthMethod::ApiKey(k) => assert_eq!(k, "sk-key"),
-            _ => panic!("expected ApiKey to take precedence"),
-        }
+            let config = ApiConfig::from_env().unwrap();
+            match &config.auth {
+                AuthMethod::ApiKey(k) => assert_eq!(k, "sk-key"),
+                _ => panic!("expected ApiKey to take precedence"),
+            }
 
-        // Restore
-        match saved_key {
-            Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
-            None => std::env::remove_var("ANTHROPIC_API_KEY"),
-        }
-        match saved_token {
-            Some(v) => std::env::set_var("ANTHROPIC_AUTH_TOKEN", v),
-            None => std::env::remove_var("ANTHROPIC_AUTH_TOKEN"),
+            restore_env("ANTHROPIC_API_KEY", saved_key);
+            restore_env("ANTHROPIC_AUTH_TOKEN", saved_token);
         }
     }
 }
