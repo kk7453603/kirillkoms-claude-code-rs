@@ -1,0 +1,108 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cc-types",
+    "crates/cc-api",
+    "crates/cc-tools",
+    "crates/cc-permissions",
+    "crates/cc-engine",
+    "crates/cc-mcp",
+    "crates/cc-commands",
+    "crates/cc-config",
+    "crates/cc-session",
+    "crates/cc-tui",
+    "crates/cc-skills",
+    "crates/cc-tasks",
+    "crates/cc-cli",
+    "crates/cc-cost",
+    "crates/cc-hooks",
+    "crates/cc-utils",
+    "crates/cc-compact",
+    "crates/cc-analytics",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["rt"] }
+async-trait = "0.1"
+async-stream = "0.3"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
+eventsource-stream = "0.2"
+
+# CLI
+clap = { version = "4", features = ["derive", "env", "string"] }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Logging/Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+globset = "0.4"
+glob = "0.3"
+similar = "2"
+which = "7"
+shell-words = "1"
+dirs = "6"
+base64 = "0.22"
+sha2 = "0.10"
+hex = "0.4"
+url = { version = "2", features = ["serde"] }
+rand = "0.9"
+jsonschema = "0.28"
+serde_yaml = "0.9"
+toml = "0.8"
+tempfile = "3"
+walkdir = "2"
+
+# Testing
+wiremock = "0.6"
+insta = { version = "1", features = ["json", "yaml"] }
+mockall = "0.13"
+assert_cmd = "2"
+predicates = "3"
+
+# Internal crates
+cc-types = { path = "crates/cc-types" }
+cc-api = { path = "crates/cc-api" }
+cc-tools = { path = "crates/cc-tools" }
+cc-permissions = { path = "crates/cc-permissions" }
+cc-engine = { path = "crates/cc-engine" }
+cc-mcp = { path = "crates/cc-mcp" }
+cc-commands = { path = "crates/cc-commands" }
+cc-config = { path = "crates/cc-config" }
+cc-session = { path = "crates/cc-session" }
+cc-tui = { path = "crates/cc-tui" }
+cc-skills = { path = "crates/cc-skills" }
+cc-tasks = { path = "crates/cc-tasks" }
+cc-cli = { path = "crates/cc-cli" }
+cc-cost = { path = "crates/cc-cost" }
+cc-hooks = { path = "crates/cc-hooks" }
+cc-utils = { path = "crates/cc-utils" }
+cc-compact = { path = "crates/cc-compact" }
+cc-analytics = { path = "crates/cc-analytics" }

@@ -1,0 +1,20 @@
+[package]
+name = "cc-permissions"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cc-types = { workspace = true }
+cc-hooks = { workspace = true }
+cc-config = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+globset = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
