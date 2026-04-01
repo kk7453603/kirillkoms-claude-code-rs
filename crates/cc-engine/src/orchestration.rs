@@ -132,6 +132,7 @@ mod tests {
     use async_trait::async_trait;
     use cc_tools::trait_def::Tool;
     use serde_json::Value;
+    use std::sync::Arc;
 
     struct ReadOnlyTool {
         name: String,
