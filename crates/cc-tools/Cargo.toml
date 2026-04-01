@@ -1,0 +1,62 @@
+[package]
+name = "cc-tools"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+repl = []
+proactive = []
+kairos = []
+kairos_webhooks = []
+agent_triggers = []
+agent_triggers_remote = []
+monitor_tool = []
+context_collapse = []
+terminal_panel = []
+web_browser = []
+coordinator_mode = []
+history_snip = []
+uds_inbox = []
+workflow_scripts = []
+verify_plan = []
+ant_only = []
+bridge_mode = []
+voice_mode = []
+testing = []
+
+[dependencies]
+cc-types = { workspace = true }
+cc-utils = { workspace = true }
+cc-mcp = { workspace = true }
+cc-permissions = { workspace = true }
+cc-skills = { workspace = true }
+cc-tasks = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+globset = { workspace = true }
+glob = { workspace = true }
+which = { workspace = true }
+shell-words = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
+jsonschema = { workspace = true }
+url = { workspace = true }
+base64 = { workspace = true }
+similar = { workspace = true }
+tokio-util = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+insta = { workspace = true }
+tempfile = { workspace = true }
+mockall = { workspace = true }

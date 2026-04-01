@@ -1,0 +1,78 @@
+# Claude Code RS — Small Business Source License (SBSL) v1.0
+
+Copyright (c) 2026 kirillkoms
+
+## Grant of License
+
+Permission is hereby granted, free of charge, to any person or entity
+meeting the criteria of a **Small Business** (as defined below), to use,
+copy, modify, merge, publish, and distribute this software and associated
+documentation files (the "Software"), subject to the following conditions:
+
+## Definitions
+
+**"Small Business"** means any individual, sole proprietorship, partnership,
+corporation, limited liability company, or other legal entity that:
+
+1. Has **fewer than 50 employees** (including contractors working more than
+   20 hours per week); AND
+2. Has **annual gross revenue of less than $5,000,000 USD** (or equivalent
+   in local currency) in the most recently completed fiscal year; AND
+3. Is **not a subsidiary, affiliate, or division** of an entity that exceeds
+   the above thresholds.
+
+**"Enterprise"** means any entity that does not qualify as a Small Business
+under the above definition.
+
+## Small Business Use
+
+Small Businesses may use, copy, modify, and distribute the Software
+**free of charge** for any purpose, including commercial use, provided that:
+
+1. This license notice and copyright notice shall be included in all copies
+   or substantial portions of the Software.
+2. Any modified versions must clearly indicate that changes were made.
+3. The Software is provided "as is" without warranty of any kind.
+
+## Enterprise Use
+
+Enterprises (entities that do **not** qualify as a Small Business) **must
+obtain a separate commercial license** before using the Software in any
+capacity, including but not limited to:
+
+- Internal use
+- Commercial products or services
+- Testing and evaluation beyond 30 days
+
+To obtain an Enterprise license, contact: **kirillkoms@github.com**
+
+A **30-day evaluation period** is granted to Enterprises for the purpose of
+evaluating the Software before purchasing a commercial license.
+
+## Contributions
+
+By submitting a contribution (pull request, patch, or other modification)
+to this project, you agree to license your contribution under the same
+terms as this license and grant the copyright holder a perpetual,
+irrevocable, worldwide, royalty-free license to use, modify, and
+distribute your contribution.
+
+## Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+## Termination
+
+This license automatically terminates if:
+
+1. A Small Business exceeds the Small Business thresholds and does not
+   obtain an Enterprise license within 90 days.
+2. Any entity violates the terms of this license.
+
+Upon termination, all rights granted under this license cease immediately.

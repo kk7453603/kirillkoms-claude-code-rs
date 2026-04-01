@@ -1,0 +1,37 @@
+[package]
+name = "cc-engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cc-types = { workspace = true }
+cc-api = { workspace = true }
+cc-tools = { workspace = true }
+cc-permissions = { workspace = true }
+cc-hooks = { workspace = true }
+cc-compact = { workspace = true }
+cc-mcp = { workspace = true }
+cc-cost = { workspace = true }
+cc-session = { workspace = true }
+cc-config = { workspace = true }
+cc-utils = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+async-trait = { workspace = true }
+async-stream = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+wiremock = { workspace = true }
+insta = { workspace = true }
+mockall = { workspace = true }
+tempfile = { workspace = true }
