@@ -422,4 +422,111 @@ mod tests {
         assert_eq!(engine.token_budget.context_window, 200_000);
         assert_eq!(engine.token_budget.max_output_tokens, 16_384);
     }
+
+    #[test]
+    fn test_new_engine_has_no_execution_context() {
+        let client = Arc::new(MockApiClient::new(vec![]));
+        let engine = QueryEngine::new(client, "test".to_string());
+        assert!(engine.execution_context.is_none());
+        assert!(engine.permission_callback.is_none());
+        assert!(engine.session_id.is_none());
+        assert!(engine.sessions_dir.is_none());
+    }
+
+    #[test]
+    fn test_set_execution_context() {
+        let client = Arc::new(MockApiClient::new(vec![]));
+        let mut engine = QueryEngine::new(client, "test".to_string());
+
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Default,
+        );
+        let exec_ctx = crate::tool_execution::ExecutionContext::new(
+            perm_ctx,
+            std::path::PathBuf::from("/tmp"),
+        );
+        engine.set_execution_context(exec_ctx);
+        assert!(engine.execution_context.is_some());
+    }
+
+    #[test]
+    fn test_set_permission_callback() {
+        let client = Arc::new(MockApiClient::new(vec![]));
+        let mut engine = QueryEngine::new(client, "test".to_string());
+
+        engine.set_permission_callback(Arc::new(
+            crate::tool_execution::AutoApproveCallback,
+        ));
+        assert!(engine.permission_callback.is_some());
+    }
+
+    #[test]
+    fn test_enable_persistence() {
+        let client = Arc::new(MockApiClient::new(vec![]));
+        let mut engine = QueryEngine::new(client, "test".to_string());
+
+        engine.enable_persistence(
+            std::path::PathBuf::from("/tmp/sessions"),
+            "test-session-id".to_string(),
+        );
+        assert_eq!(engine.session_id.as_deref(), Some("test-session-id"));
+        assert_eq!(
+            engine.sessions_dir.as_deref(),
+            Some(std::path::Path::new("/tmp/sessions"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_submit_persists_transcript() {
+        let dir = tempfile::tempdir().unwrap();
+        let sessions_dir = dir.path().to_path_buf();
+        let session_id = "persist-test";
+
+        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response(
+            "Hello!",
+        ))]));
+        let mut engine = QueryEngine::new(client, "test".to_string());
+        engine.enable_persistence(sessions_dir.clone(), session_id.to_string());
+
+        let result = engine.submit("Hi there").await;
+        assert!(result.is_ok());
+
+        // Check that transcript was written
+        let transcript_path = cc_session::storage::transcript_path(&sessions_dir, session_id);
+        let entries = cc_session::persistence::read_entries(&transcript_path).unwrap();
+
+        // Should have user_message and assistant_message entries
+        assert!(entries.len() >= 2);
+        assert_eq!(entries[0].entry_type, "user_message");
+        assert_eq!(entries[0].data["text"], "Hi there");
+
+        let last = entries.last().unwrap();
+        assert_eq!(last.entry_type, "assistant_message");
+        assert_eq!(last.data["text"], "Hello!");
+    }
+
+    #[tokio::test]
+    async fn test_submit_with_execution_context() {
+        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response(
+            "response",
+        ))]));
+        let mut engine = QueryEngine::new(client, "test".to_string());
+
+        // Set up execution context with bypass permissions
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::BypassPermissions,
+        );
+        let exec_ctx = crate::tool_execution::ExecutionContext::new(
+            perm_ctx,
+            std::path::PathBuf::from("/tmp"),
+        );
+        engine.set_execution_context(exec_ctx);
+        engine.set_permission_callback(Arc::new(
+            crate::tool_execution::AutoApproveCallback,
+        ));
+
+        let result = engine.submit("test").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "response");
+    }
 }

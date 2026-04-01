@@ -383,4 +383,223 @@ mod tests {
             _ => panic!("expected ToolResult"),
         }
     }
+
+    #[test]
+    fn test_execution_context_new() {
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Default,
+        );
+        let ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        assert_eq!(ctx.cwd, PathBuf::from("/tmp"));
+        assert!(ctx.session_id.is_none());
+        assert!(ctx.hooks_config.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_auto_approve_callback() {
+        let cb = AutoApproveCallback;
+        let approved = cb
+            .ask_permission("Bash", "run command", &serde_json::json!({}))
+            .await;
+        assert!(approved);
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_permission_allow() {
+        // BypassPermissions mode allows everything
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::BypassPermissions,
+        );
+        let exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        let cb = AutoApproveCallback;
+
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "write_tool".to_string(),
+            read_only: false,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_perm",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        assert_eq!(result.tool_use_id, "tu_perm");
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert_eq!(tr.content, serde_json::Value::String("mock result".into()));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_permission_deny() {
+        // Plan mode denies non-read-only tools
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Plan,
+        );
+        let exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        let cb = AutoApproveCallback;
+
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "write_tool".to_string(),
+            read_only: false,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_deny",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        assert_eq!(result.tool_use_id, "tu_deny");
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert!(tr.is_error);
+        assert!(tr.content.as_str().unwrap().contains("Permission denied"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_permission_ask_approved() {
+        // Default mode asks for write tools, AutoApproveCallback approves
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Default,
+        );
+        let exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        let cb = AutoApproveCallback;
+
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "write_tool".to_string(),
+            read_only: false,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_ask",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        // AutoApprove says yes, so tool should execute
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert!(!tr.is_error);
+    }
+
+    /// A callback that always denies permission.
+    struct DenyCallback;
+
+    #[async_trait]
+    impl PermissionCallback for DenyCallback {
+        async fn ask_permission(
+            &self,
+            _tool_name: &str,
+            _message: &str,
+            _input: &serde_json::Value,
+        ) -> bool {
+            false
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_permission_ask_denied() {
+        // Default mode asks for write tools, DenyCallback denies
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Default,
+        );
+        let exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        let cb = DenyCallback;
+
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "write_tool".to_string(),
+            read_only: false,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_denied",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert!(tr.is_error);
+        assert!(tr.content.as_str().unwrap().contains("User denied"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_hook_block() {
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::BypassPermissions,
+        );
+        let mut exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+
+        // Add a hook that blocks
+        exec_ctx.hooks_config.add(
+            cc_hooks::types::HookEventType::PreToolUse,
+            cc_hooks::types::HookConfig {
+                command: r#"echo '{"decision":"block","reason":"test block"}'"#.to_string(),
+                timeout_ms: 5000,
+            },
+        );
+
+        let cb = AutoApproveCallback;
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "any_tool".to_string(),
+            read_only: true,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_hook",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert!(tr.is_error);
+        assert!(tr.content.as_str().unwrap().contains("Blocked by hook"));
+        assert!(tr.content.as_str().unwrap().contains("test block"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_with_context_read_only_default_mode() {
+        // Default mode allows read-only tools without asking
+        let perm_ctx = cc_permissions::checker::PermissionContext::new(
+            cc_permissions::modes::PermissionMode::Default,
+        );
+        let exec_ctx = ExecutionContext::new(perm_ctx, PathBuf::from("/tmp"));
+        let cb = DenyCallback; // Would deny if asked, but shouldn't be asked
+
+        let tool: Arc<dyn Tool> = Arc::new(MockTool {
+            name: "read_tool".to_string(),
+            read_only: true,
+        });
+
+        let result = execute_single_tool_with_context(
+            tool,
+            serde_json::json!({}),
+            "tu_ro",
+            &exec_ctx,
+            &cb,
+        )
+        .await;
+
+        // Read-only tool should be auto-allowed in Default mode
+        assert!(result.result.is_ok());
+        let tr = result.result.unwrap();
+        assert!(!tr.is_error);
+    }
 }
