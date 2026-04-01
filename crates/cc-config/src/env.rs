@@ -26,6 +26,12 @@ pub struct EnvConfig {
     pub foundry_base_url: Option<String>,
     pub foundry_resource: Option<String>,
 
+    // OpenAI-compatible
+    pub openai_api_key: Option<String>,
+    pub openai_base_url: Option<String>,
+    pub openai_model: Option<String>,
+    pub use_openai: bool,
+
     // Features
     pub max_thinking_tokens: Option<u64>,
     pub bash_default_timeout_ms: Option<u64>,
@@ -58,6 +64,7 @@ pub enum ApiProvider {
     Bedrock,
     Vertex,
     Foundry,
+    OpenAiCompatible,
 }
 
 impl EnvConfig {
@@ -89,6 +96,13 @@ impl EnvConfig {
             // Foundry
             foundry_base_url: get_opt("ANTHROPIC_FOUNDRY_BASE_URL"),
             foundry_resource: get_opt("ANTHROPIC_FOUNDRY_RESOURCE"),
+
+            // OpenAI-compatible
+            openai_api_key: get_opt("OPENAI_API_KEY"),
+            openai_base_url: get_opt("OPENAI_BASE_URL")
+                .or_else(|| get_opt("OPENAI_API_BASE")),
+            openai_model: get_opt("OPENAI_MODEL"),
+            use_openai: get_bool("CLAUDE_CODE_USE_OPENAI"),
 
             // Features
             max_thinking_tokens: get_u64("CLAUDE_MAX_THINKING_TOKENS"),
@@ -126,6 +140,8 @@ impl EnvConfig {
             ApiProvider::Vertex
         } else if self.use_foundry {
             ApiProvider::Foundry
+        } else if self.use_openai || self.openai_api_key.is_some() {
+            ApiProvider::OpenAiCompatible
         } else {
             ApiProvider::Direct
         }
@@ -150,6 +166,10 @@ impl Default for EnvConfig {
             vertex_base_url: None,
             foundry_base_url: None,
             foundry_resource: None,
+            openai_api_key: None,
+            openai_base_url: None,
+            openai_model: None,
+            use_openai: false,
             max_thinking_tokens: None,
             bash_default_timeout_ms: None,
             bash_max_timeout_ms: None,
@@ -243,10 +263,32 @@ mod tests {
     }
 
     #[test]
+    fn provider_openai_compatible() {
+        let mut config = EnvConfig::default();
+        config.use_openai = true;
+        assert_eq!(config.provider(), ApiProvider::OpenAiCompatible);
+    }
+
+    #[test]
+    fn provider_openai_from_api_key() {
+        let mut config = EnvConfig::default();
+        config.openai_api_key = Some("sk-test".to_string());
+        assert_eq!(config.provider(), ApiProvider::OpenAiCompatible);
+    }
+
+    #[test]
     fn provider_bedrock_takes_precedence() {
         let mut config = EnvConfig::default();
         config.use_bedrock = true;
         config.use_vertex = true;
+        assert_eq!(config.provider(), ApiProvider::Bedrock);
+    }
+
+    #[test]
+    fn provider_bedrock_over_openai() {
+        let mut config = EnvConfig::default();
+        config.use_bedrock = true;
+        config.use_openai = true;
         assert_eq!(config.provider(), ApiProvider::Bedrock);
     }
 

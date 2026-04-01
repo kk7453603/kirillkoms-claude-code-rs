@@ -6,6 +6,7 @@ pub enum ApiProvider {
     Bedrock,
     Vertex,
     Foundry,
+    OpenAiCompatible,
 }
 
 impl ApiProvider {
@@ -29,6 +30,11 @@ impl ApiProvider {
             || std::env::var("AZURE_FOUNDRY_BASE_URL").is_ok()
         {
             return ApiProvider::Foundry;
+        }
+        if std::env::var("CLAUDE_CODE_USE_OPENAI").ok().as_deref() == Some("1")
+            || std::env::var("OPENAI_API_KEY").is_ok()
+        {
+            return ApiProvider::OpenAiCompatible;
         }
         ApiProvider::Direct
     }
@@ -55,16 +61,27 @@ impl ApiConfig {
         let auth_token = std::env::var("ANTHROPIC_AUTH_TOKEN")
             .ok()
             .or_else(|| std::env::var("CLAUDE_CODE_OAUTH_TOKEN").ok());
-        let base_url = std::env::var("ANTHROPIC_BASE_URL")
-            .unwrap_or_else(|_| "https://api.anthropic.com".to_string());
+        let openai_key = std::env::var("OPENAI_API_KEY").ok();
+
+        // Determine base URL: prefer provider-specific, fall back to Anthropic default
+        let base_url = if openai_key.is_some() && api_key.is_none() && auth_token.is_none() {
+            std::env::var("OPENAI_BASE_URL")
+                .or_else(|_| std::env::var("OPENAI_API_BASE"))
+                .unwrap_or_else(|_| "https://api.openai.com".to_string())
+        } else {
+            std::env::var("ANTHROPIC_BASE_URL")
+                .unwrap_or_else(|_| "https://api.anthropic.com".to_string())
+        };
 
         let auth = if let Some(key) = api_key {
             AuthMethod::ApiKey(key)
         } else if let Some(token) = auth_token {
             AuthMethod::OAuthToken(token)
+        } else if let Some(key) = openai_key {
+            AuthMethod::ApiKey(key)
         } else {
             return Err(ApiError::AuthError {
-                message: "No API key or OAuth token found. Set ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN.".into(),
+                message: "No API key or OAuth token found. Set ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or OPENAI_API_KEY.".into(),
             });
         };
 
@@ -142,6 +159,7 @@ mod tests {
                 || provider == ApiProvider::Bedrock
                 || provider == ApiProvider::Vertex
                 || provider == ApiProvider::Foundry
+                || provider == ApiProvider::OpenAiCompatible
         );
     }
 
@@ -151,7 +169,9 @@ mod tests {
         assert_eq!(ApiProvider::Bedrock, ApiProvider::Bedrock);
         assert_eq!(ApiProvider::Vertex, ApiProvider::Vertex);
         assert_eq!(ApiProvider::Foundry, ApiProvider::Foundry);
+        assert_eq!(ApiProvider::OpenAiCompatible, ApiProvider::OpenAiCompatible);
         assert_ne!(ApiProvider::Direct, ApiProvider::Bedrock);
+        assert_ne!(ApiProvider::Direct, ApiProvider::OpenAiCompatible);
     }
 
     // Note: from_env() tests that manipulate env vars are inherently racy

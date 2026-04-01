@@ -8,6 +8,7 @@ use crate::errors::ApiError;
 use crate::providers::bedrock::BedrockApiClient;
 use crate::providers::direct::DirectApiClient;
 use crate::providers::foundry::FoundryApiClient;
+use crate::providers::openai_compatible::OpenAiCompatibleClient;
 use crate::providers::vertex::VertexApiClient;
 use crate::types::{MessagesRequest, MessagesResponse, StreamEvent};
 
@@ -79,6 +80,17 @@ pub fn create_client_for_provider(
             let client = FoundryApiClient::new(base_url, resource)?;
             Ok(Box::new(client))
         }
+        ApiProvider::OpenAiCompatible => {
+            let api_key =
+                std::env::var("OPENAI_API_KEY").map_err(|_| ApiError::AuthError {
+                    message: "OPENAI_API_KEY must be set for OpenAI-compatible provider".into(),
+                })?;
+            let base_url = std::env::var("OPENAI_BASE_URL")
+                .or_else(|_| std::env::var("OPENAI_API_BASE"))
+                .unwrap_or_else(|_| "https://api.openai.com".to_string());
+            let client = OpenAiCompatibleClient::new(api_key, base_url)?;
+            Ok(Box::new(client))
+        }
     }
 }
 
@@ -132,6 +144,17 @@ mod tests {
             ApiProvider::Foundry,
         );
         // Result depends on env
+        let _ = result;
+    }
+
+    #[test]
+    fn create_client_for_openai_provider() {
+        // Without OPENAI_API_KEY, should error
+        let result = create_client_for_provider(
+            ApiConfig::with_api_key("unused".to_string()),
+            ApiProvider::OpenAiCompatible,
+        );
+        // Result depends on env (OPENAI_API_KEY presence)
         let _ = result;
     }
 }

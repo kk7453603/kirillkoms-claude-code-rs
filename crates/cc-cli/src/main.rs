@@ -92,9 +92,11 @@ async fn create_api_client() -> anyhow::Result<Arc<dyn cc_api::client::ApiClient
             eprintln!("  ANTHROPIC_API_KEY      - Your Anthropic API key");
             eprintln!("  ANTHROPIC_AUTH_TOKEN    - An OAuth token");
             eprintln!("  CLAUDE_CODE_OAUTH_TOKEN - An OAuth token (alternative)");
+            eprintln!("  OPENAI_API_KEY         - An OpenAI-compatible API key");
             eprintln!();
             eprintln!("Example:");
             eprintln!("  export ANTHROPIC_API_KEY=sk-ant-...");
+            eprintln!("  export OPENAI_API_KEY=sk-... OPENAI_BASE_URL=http://localhost:11434");
             std::process::exit(1);
         }
     };
@@ -114,10 +116,16 @@ async fn build_engine(
 ) -> anyhow::Result<QueryEngine> {
     let api_client = create_api_client().await?;
 
-    let model_str = args
-        .model
-        .as_deref()
-        .unwrap_or(cc_config::model_config::default_model());
+    // Model resolution: CLI arg > OPENAI_MODEL (for OpenAI provider) > default
+    let openai_model_env = std::env::var("OPENAI_MODEL").ok();
+    let default_model = if openai_model_env.is_some()
+        && cc_api::auth::ApiProvider::from_env() == cc_api::auth::ApiProvider::OpenAiCompatible
+    {
+        openai_model_env.as_deref().unwrap_or(cc_config::model_config::default_model())
+    } else {
+        cc_config::model_config::default_model()
+    };
+    let model_str = args.model.as_deref().unwrap_or(default_model);
 
     // Resolve aliases like "opus" -> "claude-opus-4-6"
     let model = cc_config::model_config::resolve_model_alias(model_str)
