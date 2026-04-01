@@ -5,7 +5,7 @@ use cc_hooks::types::{HookEventType, HookOutcome, HooksConfig};
 use cc_permissions::checker::{PermissionContext, PermissionDecision};
 use cc_tools::trait_def::{Tool, ToolError, ToolResult};
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::orchestration::ToolCallResult;

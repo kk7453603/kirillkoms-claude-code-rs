@@ -6,6 +6,11 @@ use cc_cli::CliArgs;
 use cc_engine::context::SystemContext;
 use cc_engine::query_engine::QueryEngine;
 use cc_engine::query_loop::QueryEvent;
+use cc_engine::tool_execution::{
+    AutoApproveCallback, ExecutionContext, InteractivePermissionCallback,
+};
+use cc_permissions::checker::PermissionContext;
+use cc_permissions::modes::PermissionMode;
 use clap::Parser;
 use tokio_stream::StreamExt;
 
@@ -59,9 +64,6 @@ async fn main() -> anyhow::Result<()> {
 
     if is_print_mode {
         run_print_mode(args, project_root).await
-    } else if args.prompt.is_some() {
-        // Prompt given without --print: single query then interactive
-        run_interactive_mode(args, project_root).await
     } else {
         run_interactive_mode(args, project_root).await
     }
@@ -107,7 +109,11 @@ async fn create_api_client() -> anyhow::Result<Arc<dyn cc_api::client::ApiClient
 }
 
 /// Build a QueryEngine with all the standard setup.
-async fn build_engine(args: &CliArgs, project_root: &PathBuf) -> anyhow::Result<QueryEngine> {
+async fn build_engine(
+    args: &CliArgs,
+    project_root: &PathBuf,
+    is_interactive: bool,
+) -> anyhow::Result<QueryEngine> {
     let api_client = create_api_client().await?;
 
     let model_str = args
@@ -129,12 +135,57 @@ async fn build_engine(args: &CliArgs, project_root: &PathBuf) -> anyhow::Result<
     let ctx = build_system_context(args, project_root).await;
     engine.set_system_context(ctx);
 
+    // Set up permission context based on --permission-mode
+    let permission_mode = PermissionMode::from_str_opt(&args.permission_mode)
+        .unwrap_or(PermissionMode::Default);
+    let permission_ctx = PermissionContext::new(permission_mode);
+
+    // Build execution context with hooks config and permission context
+    let hooks_config = cc_hooks::types::HooksConfig::new();
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    let mut exec_ctx = ExecutionContext::new(permission_ctx, project_root.clone());
+    exec_ctx.hooks_config = hooks_config;
+    exec_ctx.session_id = Some(session_id.clone());
+
+    engine.set_execution_context(exec_ctx);
+
+    // Set permission callback based on mode
+    if is_interactive {
+        engine.set_permission_callback(Arc::new(InteractivePermissionCallback));
+    } else {
+        // In print/pipe mode, auto-approve since there's no user to ask
+        engine.set_permission_callback(Arc::new(AutoApproveCallback));
+    }
+
+    // Enable session persistence
+    let sessions_dir = dirs::data_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("claude-code")
+        .join("sessions");
+    engine.enable_persistence(sessions_dir.clone(), session_id.clone());
+
+    // Persist session start entry
+    let start_path = cc_session::storage::transcript_path(&sessions_dir, &session_id);
+    let start_entry = cc_session::persistence::TranscriptEntry {
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        entry_type: "session_start".to_string(),
+        data: serde_json::json!({
+            "project_root": project_root.display().to_string(),
+            "model": &engine.model,
+            "permission_mode": args.permission_mode,
+        }),
+    };
+    if let Err(e) = cc_session::persistence::append_entry(&start_path, &start_entry) {
+        tracing::warn!("Failed to persist session start: {}", e);
+    }
+
     Ok(engine)
 }
 
 /// Non-interactive pipe/print mode.
 async fn run_print_mode(args: CliArgs, project_root: PathBuf) -> anyhow::Result<()> {
-    let mut engine = build_engine(&args, &project_root).await?;
+    let mut engine = build_engine(&args, &project_root, false).await?;
 
     // Gather the prompt: from --prompt arg, or from stdin, or both
     let mut prompt = String::new();
@@ -204,9 +255,55 @@ async fn run_print_mode(args: CliArgs, project_root: PathBuf) -> anyhow::Result<
 
 /// Interactive REPL mode.
 async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::Result<()> {
-    let mut engine = build_engine(&args, &project_root).await?;
+    let mut engine = build_engine(&args, &project_root, true).await?;
     let command_registry = cc_commands::registry::CommandRegistry::with_defaults();
     let verbose = args.verbose;
+
+    // Handle --resume: load previous session transcript
+    if let Some(ref resume_id) = args.resume {
+        let sessions_dir = dirs::data_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("claude-code")
+            .join("sessions");
+
+        match cc_session::resume::load_resume_data(&sessions_dir, resume_id) {
+            Ok(data) => {
+                // Re-use the same session ID for continued persistence
+                engine.enable_persistence(sessions_dir, resume_id.clone());
+
+                // Restore messages from transcript
+                for msg_data in &data.messages {
+                    if let Some(text) = msg_data.get("text").and_then(|v| v.as_str()) {
+                        // Determine role from the original entry type
+                        // In our transcript, user_message and assistant_message are saved
+                        // with {"text": "..."} data. We reconstruct ApiMessage from them.
+                        // The resume module already filtered to only user/assistant messages.
+                        // We alternate: first is user, then assistant, etc.
+                        let role = if engine.messages.len() % 2 == 0 {
+                            cc_api::types::Role::User
+                        } else {
+                            cc_api::types::Role::Assistant
+                        };
+                        engine.messages.push(cc_api::types::ApiMessage {
+                            role,
+                            content: vec![cc_api::types::ContentBlock::Text {
+                                text: text.to_string(),
+                            }],
+                        });
+                    }
+                }
+
+                eprintln!(
+                    "Resumed session {} with {} messages",
+                    resume_id,
+                    engine.messages.len()
+                );
+            }
+            Err(e) => {
+                eprintln!("Warning: Could not resume session '{}': {}", resume_id, e);
+            }
+        }
+    }
 
     let model_str = args
         .model
@@ -218,6 +315,9 @@ async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::R
     println!("Claude Code v{}", env!("CARGO_PKG_VERSION"));
     println!("Model: {}", model_display);
     println!("Working directory: {}", project_root.display());
+    if let Some(ref sid) = engine.session_id {
+        println!("Session: {}", sid);
+    }
     println!();
     println!("Type your message, or use /help for commands. Press Ctrl+C to exit.");
     println!();

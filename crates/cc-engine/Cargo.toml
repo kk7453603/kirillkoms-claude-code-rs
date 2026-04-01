@@ -12,6 +12,7 @@ cc-hooks = { workspace = true }
 cc-compact = { workspace = true }
 cc-mcp = { workspace = true }
 cc-cost = { workspace = true }
+cc-session = { workspace = true }
 cc-config = { workspace = true }
 cc-utils = { workspace = true }
 tokio = { workspace = true }

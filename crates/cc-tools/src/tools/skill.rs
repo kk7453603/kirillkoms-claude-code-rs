@@ -69,11 +69,41 @@ impl Tool for SkillTool {
         let skill_name = input
             .get("skill")
             .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
+            .ok_or(ToolError::ValidationFailed {
+                message: "Missing 'skill' parameter".into(),
+            })?;
+        let args = input
+            .get("args")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
-        Ok(ToolResult::error(&format!(
-            "Skill '{}' is not yet available. Skill execution requires the skill registry to be initialized. Available skills depend on the configured skill providers.",
-            skill_name
+        // Look up in bundled skills
+        let skills = cc_skills::bundled::bundled_skills();
+        let skill = skills
+            .iter()
+            .find(|s| s.name == skill_name)
+            .ok_or_else(|| ToolError::ExecutionFailed {
+                message: format!(
+                    "Skill '{}' not found. Available: {}",
+                    skill_name,
+                    skills
+                        .iter()
+                        .map(|s| s.name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            })?;
+
+        // Build prompt from template
+        let prompt = if args.is_empty() {
+            skill.prompt_template.clone()
+        } else {
+            format!("{}\n\nArguments: {}", skill.prompt_template, args)
+        };
+
+        Ok(ToolResult::text(&format!(
+            "Executing skill '{}': {}",
+            skill_name, prompt
         )))
     }
 }
@@ -107,14 +137,36 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_call_returns_stub() {
+    async fn test_call_known_skill() {
         let tool = SkillTool::new();
         let result = tool
             .call(json!({"skill": "commit", "args": "-m 'fix'"}))
             .await
             .unwrap();
-        assert!(result.is_error);
-        assert!(result.content.as_str().unwrap().contains("commit"));
+        assert!(!result.is_error);
+        let text = result.content.as_str().unwrap();
+        assert!(text.contains("commit"));
+        assert!(text.contains("Arguments: -m 'fix'"));
+    }
+
+    #[tokio::test]
+    async fn test_call_unknown_skill() {
+        let tool = SkillTool::new();
+        let result = tool
+            .call(json!({"skill": "nonexistent"}))
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_call_skill_no_args() {
+        let tool = SkillTool::new();
+        let result = tool
+            .call(json!({"skill": "review-pr"}))
+            .await
+            .unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("review-pr"));
     }
 
     #[test]

@@ -1,12 +1,16 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio_stream::{Stream, StreamExt};
 
 use cc_api::types::{ApiMessage, ContentBlock, Role};
+use cc_session::persistence::{append_entry, TranscriptEntry};
+use cc_session::storage::transcript_path;
 use cc_tools::registry::ToolRegistry;
 
 use crate::context::SystemContext;
 use crate::query_loop::{self, QueryEvent, QueryParams};
 use crate::token_budget::TokenBudget;
+use crate::tool_execution::{ExecutionContext, PermissionCallback};
 
 /// High-level query engine that manages conversation state.
 pub struct QueryEngine {
@@ -17,6 +21,11 @@ pub struct QueryEngine {
     pub system_context: SystemContext,
     pub messages: Vec<ApiMessage>,
     pub token_budget: TokenBudget,
+    pub execution_context: Option<ExecutionContext>,
+    pub permission_callback: Option<Arc<dyn PermissionCallback>>,
+    /// Session persistence fields
+    pub session_id: Option<String>,
+    pub sessions_dir: Option<PathBuf>,
 }
 
 impl QueryEngine {
@@ -29,6 +38,41 @@ impl QueryEngine {
             system_context: SystemContext::default(),
             messages: Vec::new(),
             token_budget: TokenBudget::default(),
+            execution_context: None,
+            permission_callback: None,
+            session_id: None,
+            sessions_dir: None,
+        }
+    }
+
+    /// Set the execution context for permission checking and hooks.
+    pub fn set_execution_context(&mut self, ctx: ExecutionContext) {
+        self.execution_context = Some(ctx);
+    }
+
+    /// Set the permission callback for interactive prompts.
+    pub fn set_permission_callback(&mut self, cb: Arc<dyn PermissionCallback>) {
+        self.permission_callback = Some(cb);
+    }
+
+    /// Enable session persistence.
+    pub fn enable_persistence(&mut self, sessions_dir: PathBuf, session_id: String) {
+        self.session_id = Some(session_id);
+        self.sessions_dir = Some(sessions_dir);
+    }
+
+    /// Persist a transcript entry if persistence is enabled.
+    fn persist_entry(&self, entry_type: &str, data: serde_json::Value) {
+        if let (Some(dir), Some(id)) = (&self.sessions_dir, &self.session_id) {
+            let path = transcript_path(dir, id);
+            let entry = TranscriptEntry {
+                timestamp: chrono::Utc::now().to_rfc3339(),
+                entry_type: entry_type.to_string(),
+                data,
+            };
+            if let Err(e) = append_entry(&path, &entry) {
+                tracing::warn!("Failed to persist transcript entry: {}", e);
+            }
         }
     }
 
@@ -42,6 +86,12 @@ impl QueryEngine {
             }],
         });
 
+        // Persist user message
+        self.persist_entry(
+            "user_message",
+            serde_json::json!({ "text": user_message }),
+        );
+
         let system = self.system_context.to_system_blocks();
 
         let params = QueryParams {
@@ -53,6 +103,8 @@ impl QueryEngine {
             api_client: Arc::clone(&self.api_client),
             max_turns: self.max_turns,
             thinking: None,
+            execution_context: self.execution_context.clone(),
+            permission_callback: self.permission_callback.clone(),
         };
 
         let stream = query_loop::query(params);
@@ -68,16 +120,35 @@ impl QueryEngine {
                     full_text.push_str(&text);
                     got_response = true;
                 }
-                QueryEvent::Error(e) => {
-                    last_error = Some(e);
+                QueryEvent::ToolUseStart { ref id, ref name } => {
+                    self.persist_entry(
+                        "tool_use",
+                        serde_json::json!({ "id": id, "name": name }),
+                    );
+                }
+                QueryEvent::ToolResult {
+                    ref id,
+                    ref result,
+                    is_error,
+                } => {
+                    self.persist_entry(
+                        "tool_result",
+                        serde_json::json!({
+                            "id": id,
+                            "result": result,
+                            "is_error": is_error,
+                        }),
+                    );
+                }
+                QueryEvent::Error(ref e) => {
+                    last_error = Some(e.clone());
                     break;
                 }
-                QueryEvent::TurnComplete { stop_reason } => {
+                QueryEvent::TurnComplete { ref stop_reason } => {
                     if stop_reason == "max_turns" && !got_response {
                         return Err(EngineError::MaxTurnsExceeded);
                     }
                 }
-                // For submit(), we just collect text; tool events are handled internally
                 _ => {}
             }
         }
@@ -100,6 +171,12 @@ impl QueryEngine {
             }],
         });
 
+        // Persist assistant message
+        self.persist_entry(
+            "assistant_message",
+            serde_json::json!({ "text": &full_text }),
+        );
+
         Ok(full_text)
     }
 
@@ -116,6 +193,12 @@ impl QueryEngine {
             }],
         });
 
+        // Persist user message
+        self.persist_entry(
+            "user_message",
+            serde_json::json!({ "text": user_message }),
+        );
+
         let system = self.system_context.to_system_blocks();
 
         let params = QueryParams {
@@ -127,6 +210,8 @@ impl QueryEngine {
             api_client: Arc::clone(&self.api_client),
             max_turns: self.max_turns,
             thinking: None,
+            execution_context: self.execution_context.clone(),
+            permission_callback: self.permission_callback.clone(),
         };
 
         query_loop::query(params)

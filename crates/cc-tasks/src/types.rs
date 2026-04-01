@@ -52,6 +52,19 @@ impl TaskManager {
         &self.tasks
     }
 
+    pub fn set_output(&mut self, id: &str, output: String) -> bool {
+        if let Some(task) = self.tasks.iter_mut().find(|t| t.id == id) {
+            task.output = Some(output);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn tasks_by_status(&self, status: TaskStatus) -> Vec<&TaskInfo> {
+        self.tasks.iter().filter(|t| t.status == status).collect()
+    }
+
     pub fn remove_task(&mut self, id: &str) -> Option<TaskInfo> {
         if let Some(pos) = self.tasks.iter().position(|t| t.id == id) {
             Some(self.tasks.remove(pos))

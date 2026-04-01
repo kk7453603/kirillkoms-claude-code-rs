@@ -1,7 +1,36 @@
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::sync::{LazyLock, Mutex};
+
+use cc_tasks::types::{TaskInfo, TaskManager, TaskStatus};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
+
+static TASK_MANAGER: LazyLock<Mutex<TaskManager>> = LazyLock::new(|| {
+    Mutex::new(TaskManager::new())
+});
+
+fn parse_status(s: &str) -> Option<TaskStatus> {
+    match s {
+        "pending" => Some(TaskStatus::Pending),
+        "running" => Some(TaskStatus::Running),
+        "completed" => Some(TaskStatus::Completed),
+        "failed" => Some(TaskStatus::Failed),
+        "cancelled" => Some(TaskStatus::Cancelled),
+        _ => None,
+    }
+}
+
+fn task_to_json(task: &TaskInfo) -> Value {
+    json!({
+        "id": task.id,
+        "name": task.name,
+        "status": task.status,
+        "created_at": task.created_at,
+        "description": task.description,
+        "output": task.output,
+    })
+}
 
 // ──────────────── TaskCreateTool ────────────────
 
@@ -62,10 +91,30 @@ impl Tool for TaskCreateTool {
         }
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error(
-            "Task creation requires engine integration and is not yet available. Use the Agent tool or handle the task directly.",
-        ))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let prompt = input.get("prompt").and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed { message: "Missing 'prompt' parameter".into() })?;
+        let description = input.get("description").and_then(|v| v.as_str());
+
+        let task_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        let task = TaskInfo {
+            id: task_id.clone(),
+            name: description.unwrap_or(prompt).chars().take(80).collect(),
+            status: TaskStatus::Pending,
+            created_at: now,
+            description: description.map(|s| s.to_string()),
+            output: None,
+        };
+
+        let mut mgr = TASK_MANAGER.lock().unwrap();
+        mgr.add_task(task);
+
+        Ok(ToolResult::text(&format!(
+            "Task created with ID: {}\nStatus: pending",
+            task_id
+        )))
     }
 }
 
@@ -113,8 +162,19 @@ impl Tool for TaskGetTool {
         }
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error("Task management is not yet available."))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let task_id = input.get("task_id").and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+
+        let mgr = TASK_MANAGER.lock().unwrap();
+        match mgr.get_task(task_id) {
+            Some(task) => {
+                let json = serde_json::to_string_pretty(&task_to_json(task))
+                    .unwrap_or_else(|_| "Error serializing task".to_string());
+                Ok(ToolResult::text(&json))
+            }
+            None => Ok(ToolResult::error(&format!("Task '{}' not found", task_id))),
+        }
     }
 }
 
@@ -171,8 +231,43 @@ impl Tool for TaskUpdateTool {
         }
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error("Task management is not yet available."))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let task_id = input.get("task_id").and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let status_str = input.get("status").and_then(|v| v.as_str());
+        let result_str = input.get("result").and_then(|v| v.as_str());
+
+        let mut mgr = TASK_MANAGER.lock().unwrap();
+
+        // Check task exists
+        if mgr.get_task(task_id).is_none() {
+            return Ok(ToolResult::error(&format!("Task '{}' not found", task_id)));
+        }
+
+        let mut updated = Vec::new();
+
+        if let Some(status_s) = status_str {
+            match parse_status(status_s) {
+                Some(status) => {
+                    mgr.update_status(task_id, status);
+                    updated.push(format!("status -> {}", status_s));
+                }
+                None => {
+                    return Ok(ToolResult::error(&format!("Invalid status: '{}'", status_s)));
+                }
+            }
+        }
+
+        if let Some(result) = result_str {
+            mgr.set_output(task_id, result.to_string());
+            updated.push("output updated".to_string());
+        }
+
+        if updated.is_empty() {
+            Ok(ToolResult::text(&format!("Task '{}': no changes applied (provide 'status' or 'result')", task_id)))
+        } else {
+            Ok(ToolResult::text(&format!("Task '{}' updated: {}", task_id, updated.join(", "))))
+        }
     }
 }
 
@@ -220,8 +315,28 @@ impl Tool for TaskStopTool {
         }
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error("Task management is not yet available."))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let task_id = input.get("task_id").and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+
+        let mut mgr = TASK_MANAGER.lock().unwrap();
+        match mgr.get_task(task_id) {
+            Some(task) => {
+                match task.status {
+                    TaskStatus::Running | TaskStatus::Pending => {
+                        mgr.update_status(task_id, TaskStatus::Cancelled);
+                        Ok(ToolResult::text(&format!("Task '{}' has been cancelled", task_id)))
+                    }
+                    other => {
+                        Ok(ToolResult::error(&format!(
+                            "Task '{}' cannot be stopped (current status: {:?})",
+                            task_id, other
+                        )))
+                    }
+                }
+            }
+            None => Ok(ToolResult::error(&format!("Task '{}' not found", task_id))),
+        }
     }
 }
 
@@ -267,8 +382,34 @@ impl Tool for TaskListTool {
         ValidationResult::Ok
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error("Task management is not yet available."))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let status_filter = input.get("status_filter").and_then(|v| v.as_str());
+
+        let mgr = TASK_MANAGER.lock().unwrap();
+        let all_tasks = mgr.list_tasks();
+
+        let tasks: Vec<Value> = if let Some(filter_str) = status_filter {
+            match parse_status(filter_str) {
+                Some(status) => all_tasks.iter()
+                    .filter(|t| t.status == status)
+                    .map(task_to_json)
+                    .collect(),
+                None => {
+                    return Ok(ToolResult::error(&format!("Invalid status filter: '{}'", filter_str)));
+                }
+            }
+        } else {
+            all_tasks.iter().map(task_to_json).collect()
+        };
+
+        let result = json!({
+            "count": tasks.len(),
+            "tasks": tasks
+        });
+
+        let json_str = serde_json::to_string_pretty(&result)
+            .unwrap_or_else(|_| "Error serializing tasks".to_string());
+        Ok(ToolResult::text(&json_str))
     }
 }
 
@@ -320,8 +461,36 @@ impl Tool for TaskOutputTool {
         }
     }
 
-    async fn call(&self, _input: Value) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::error("Task management is not yet available."))
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let task_id = input.get("task_id").and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let tail = input.get("tail").and_then(|v| v.as_u64());
+
+        let mgr = TASK_MANAGER.lock().unwrap();
+        match mgr.get_task(task_id) {
+            Some(task) => {
+                match &task.output {
+                    Some(output) => {
+                        let text = if let Some(n) = tail {
+                            let lines: Vec<&str> = output.lines().collect();
+                            let start = lines.len().saturating_sub(n as usize);
+                            lines[start..].join("\n")
+                        } else {
+                            output.clone()
+                        };
+                        Ok(ToolResult::text(&format!(
+                            "Task '{}' (status: {:?}):\n{}",
+                            task_id, task.status, text
+                        )))
+                    }
+                    None => Ok(ToolResult::text(&format!(
+                        "Task '{}' (status: {:?}): no output yet",
+                        task_id, task.status
+                    ))),
+                }
+            }
+            None => Ok(ToolResult::error(&format!("Task '{}' not found", task_id))),
+        }
     }
 }
 
@@ -354,17 +523,102 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_task_create_stub() {
-        let tool = TaskCreateTool::new();
-        let result = tool.call(json!({"prompt": "test"})).await.unwrap();
-        assert!(result.is_error);
-        assert!(result.content.as_str().unwrap().contains("not yet available"));
+    async fn test_task_create_and_get() {
+        let create = TaskCreateTool::new();
+        let result = create.call(json!({"prompt": "test task", "description": "My task"})).await.unwrap();
+        assert!(!result.is_error);
+        let text = result.content.as_str().unwrap();
+        assert!(text.contains("Task created with ID:"));
+
+        // Extract task ID from result
+        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+
+        // Get the task
+        let get = TaskGetTool::new();
+        let result = get.call(json!({"task_id": task_id})).await.unwrap();
+        assert!(!result.is_error);
+        let text = result.content.as_str().unwrap();
+        assert!(text.contains("pending"));
     }
 
     #[tokio::test]
-    async fn test_task_list_stub() {
-        let tool = TaskListTool::new();
-        let result = tool.call(json!({})).await.unwrap();
+    async fn test_task_update() {
+        let create = TaskCreateTool::new();
+        let result = create.call(json!({"prompt": "update test"})).await.unwrap();
+        let text = result.content.as_str().unwrap();
+        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+
+        let update = TaskUpdateTool::new();
+        let result = update.call(json!({"task_id": task_id, "status": "running"})).await.unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("status -> running"));
+
+        // Update with result
+        let result = update.call(json!({"task_id": task_id, "result": "done!"})).await.unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("output updated"));
+    }
+
+    #[tokio::test]
+    async fn test_task_stop() {
+        let create = TaskCreateTool::new();
+        let result = create.call(json!({"prompt": "stop test"})).await.unwrap();
+        let text = result.content.as_str().unwrap();
+        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+
+        let stop = TaskStopTool::new();
+        let result = stop.call(json!({"task_id": task_id})).await.unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("cancelled"));
+    }
+
+    #[tokio::test]
+    async fn test_task_list() {
+        let list = TaskListTool::new();
+        let result = list.call(json!({})).await.unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("count"));
+    }
+
+    #[tokio::test]
+    async fn test_task_output() {
+        let create = TaskCreateTool::new();
+        let result = create.call(json!({"prompt": "output test"})).await.unwrap();
+        let text = result.content.as_str().unwrap();
+        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+
+        let output = TaskOutputTool::new();
+        let result = output.call(json!({"task_id": task_id})).await.unwrap();
+        assert!(!result.is_error);
+        assert!(result.content.as_str().unwrap().contains("no output yet"));
+
+        // Add output
+        let update = TaskUpdateTool::new();
+        update.call(json!({"task_id": task_id, "result": "line1\nline2\nline3"})).await.unwrap();
+
+        // Get output with tail
+        let result = output.call(json!({"task_id": task_id, "tail": 2})).await.unwrap();
+        assert!(!result.is_error);
+        let text = result.content.as_str().unwrap();
+        assert!(text.contains("line2"));
+        assert!(text.contains("line3"));
+    }
+
+    #[tokio::test]
+    async fn test_task_get_not_found() {
+        let get = TaskGetTool::new();
+        let result = get.call(json!({"task_id": "nonexistent-id"})).await.unwrap();
         assert!(result.is_error);
+        assert!(result.content.as_str().unwrap().contains("not found"));
+    }
+
+    #[test]
+    fn test_parse_status() {
+        assert_eq!(parse_status("pending"), Some(TaskStatus::Pending));
+        assert_eq!(parse_status("running"), Some(TaskStatus::Running));
+        assert_eq!(parse_status("completed"), Some(TaskStatus::Completed));
+        assert_eq!(parse_status("failed"), Some(TaskStatus::Failed));
+        assert_eq!(parse_status("cancelled"), Some(TaskStatus::Cancelled));
+        assert_eq!(parse_status("invalid"), None);
     }
 }
