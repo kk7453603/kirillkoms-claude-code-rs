@@ -123,6 +123,6 @@ mod tests {
     #[test]
     fn test_all_commands_count() {
         let cmds = commands::all_commands();
-        assert_eq!(cmds.len(), 50);
+        assert_eq!(cmds.len(), 99);
     }
 }
