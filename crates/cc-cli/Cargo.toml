@@ -26,6 +26,7 @@ cc-skills = { workspace = true }
 cc-tasks = { workspace = true }
 cc-permissions = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
