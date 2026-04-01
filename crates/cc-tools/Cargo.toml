@@ -29,7 +29,6 @@ testing = []
 cc-types = { workspace = true }
 cc-utils = { workspace = true }
 cc-mcp = { workspace = true }
-cc-skills = { workspace = true }
 cc-permissions = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
