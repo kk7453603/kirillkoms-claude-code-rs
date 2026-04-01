@@ -10,7 +10,10 @@ pub fn settings_need_sync(local: &SettingsJson, remote: &SettingsJson) -> bool {
 /// Merge remote settings into local (remote takes precedence for conflicting keys).
 pub fn sync_settings(local: &SettingsJson, remote: &SettingsJson) -> SettingsJson {
     SettingsJson {
-        permissions: remote.permissions.clone().or_else(|| local.permissions.clone()),
+        permissions: remote
+            .permissions
+            .clone()
+            .or_else(|| local.permissions.clone()),
         hooks: remote.hooks.clone().or_else(|| local.hooks.clone()),
         env: match (&local.env, &remote.env) {
             (Some(local_env), Some(remote_env)) => {

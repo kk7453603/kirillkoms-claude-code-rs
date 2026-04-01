@@ -5,7 +5,11 @@ pub fn unified_diff(old: &str, new: &str, context_lines: usize) -> String {
     let diff = TextDiff::from_lines(old, new);
     let mut output = String::new();
 
-    for hunk in diff.unified_diff().context_radius(context_lines).iter_hunks() {
+    for hunk in diff
+        .unified_diff()
+        .context_radius(context_lines)
+        .iter_hunks()
+    {
         output.push_str(&format!("{}", hunk));
     }
 
@@ -157,7 +161,10 @@ mod tests {
     fn test_apply_edit_multiple_matches_error() {
         let content = "aaa bbb aaa";
         let result = apply_edit(content, "aaa", "ccc", false);
-        assert!(matches!(result, Err(EditError::MultipleMatches { count: 2 })));
+        assert!(matches!(
+            result,
+            Err(EditError::MultipleMatches { count: 2 })
+        ));
     }
 
     #[test]

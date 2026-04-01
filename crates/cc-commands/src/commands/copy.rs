@@ -11,9 +11,7 @@ pub static COPY: CommandDef = CommandDef {
             // In a real implementation, we'd access the conversation history
             // to get the last assistant response. For now, provide guidance.
             match cc_utils::clipboard::copy_to_clipboard("(last response would be copied here)") {
-                Ok(()) => Ok(CommandOutput::message(
-                    "Last response copied to clipboard.",
-                )),
+                Ok(()) => Ok(CommandOutput::message("Last response copied to clipboard.")),
                 Err(e) => Ok(CommandOutput::message(&format!(
                     "Failed to copy to clipboard: {}\n\
                      Make sure xclip (Linux) or pbcopy (macOS) is installed.",

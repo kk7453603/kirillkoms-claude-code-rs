@@ -9,7 +9,7 @@ use cc_api::types::{
 };
 use cc_tools::registry::ToolRegistry;
 
-use crate::orchestration::{execute_tool_calls, execute_tool_calls_with_context, PendingToolCall};
+use crate::orchestration::{PendingToolCall, execute_tool_calls, execute_tool_calls_with_context};
 use crate::streaming::StreamState;
 use crate::tool_execution::{ExecutionContext, PermissionCallback};
 
@@ -328,7 +328,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_max_turns_zero() {
-
         let reg = Arc::new(ToolRegistry::new());
         let api_client = Arc::new(MockApiClient::new(vec![]));
 
@@ -357,7 +356,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_simple_text_response() {
-
         let response = cc_api::types::MessagesResponse {
             id: "msg_1".to_string(),
             model: "test".to_string(),
@@ -401,17 +399,22 @@ mod tests {
         }
 
         // Streaming yields: TextDelta(s), UsageUpdate(s), TurnComplete
-        let has_text = events.iter().any(|e| matches!(e, QueryEvent::TextDelta(t) if t == "Hello!"));
+        let has_text = events
+            .iter()
+            .any(|e| matches!(e, QueryEvent::TextDelta(t) if t == "Hello!"));
         assert!(has_text, "expected TextDelta with 'Hello!'");
-        let has_complete = events.iter().any(|e| matches!(e, QueryEvent::TurnComplete { stop_reason } if stop_reason == "end_turn"));
+        let has_complete = events.iter().any(
+            |e| matches!(e, QueryEvent::TurnComplete { stop_reason } if stop_reason == "end_turn"),
+        );
         assert!(has_complete, "expected TurnComplete with 'end_turn'");
-        let has_usage = events.iter().any(|e| matches!(e, QueryEvent::UsageUpdate { .. }));
+        let has_usage = events
+            .iter()
+            .any(|e| matches!(e, QueryEvent::UsageUpdate { .. }));
         assert!(has_usage, "expected at least one UsageUpdate");
     }
 
     #[tokio::test]
     async fn test_query_api_error() {
-
         let api_client = Arc::new(MockApiClient::new(vec![Err(
             cc_api::errors::ApiError::ConnectionError {
                 message: "connection refused".to_string(),
@@ -473,12 +476,13 @@ mod tests {
                 ContentBlock::Text { text } => {
                     events.push(StreamEvent::ContentBlockDelta {
                         index: i,
-                        delta: ContentDelta::TextDelta {
-                            text: text.clone(),
-                        },
+                        delta: ContentDelta::TextDelta { text: text.clone() },
                     });
                 }
-                ContentBlock::Thinking { thinking, signature } => {
+                ContentBlock::Thinking {
+                    thinking,
+                    signature,
+                } => {
                     events.push(StreamEvent::ContentBlockDelta {
                         index: i,
                         delta: ContentDelta::ThinkingDelta {
@@ -498,9 +502,7 @@ mod tests {
                     let json = serde_json::to_string(input).unwrap_or_default();
                     events.push(StreamEvent::ContentBlockDelta {
                         index: i,
-                        delta: ContentDelta::InputJsonDelta {
-                            partial_json: json,
-                        },
+                        delta: ContentDelta::InputJsonDelta { partial_json: json },
                     });
                 }
                 _ => {}
@@ -521,15 +523,14 @@ mod tests {
     }
 
     struct MockApiClient {
-        responses:
-            std::sync::Mutex<Vec<Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>>>,
+        responses: std::sync::Mutex<
+            Vec<Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>>,
+        >,
     }
 
     impl MockApiClient {
         fn new(
-            responses: Vec<
-                Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>,
-            >,
+            responses: Vec<Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>>,
         ) -> Self {
             // Reverse so we can pop from the end
             let mut responses = responses;
@@ -581,9 +582,11 @@ mod tests {
             _request: MessagesRequest,
         ) -> Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError> {
             let mut responses = self.responses.lock().unwrap();
-            responses.pop().unwrap_or(Err(cc_api::errors::ApiError::InvalidRequest {
-                message: "no more mock responses".to_string(),
-            }))
+            responses
+                .pop()
+                .unwrap_or(Err(cc_api::errors::ApiError::InvalidRequest {
+                    message: "no more mock responses".to_string(),
+                }))
         }
     }
 }

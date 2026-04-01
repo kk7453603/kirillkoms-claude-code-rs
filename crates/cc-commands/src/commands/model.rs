@@ -37,9 +37,7 @@ pub static MODEL: CommandDef = CommandDef {
                     }
                 }
                 lines.push(String::new());
-                lines.push(
-                    "Aliases: opus, sonnet, haiku".to_string(),
-                );
+                lines.push("Aliases: opus, sonnet, haiku".to_string());
                 return Ok(CommandOutput::message(&lines.join("\n")));
             }
 

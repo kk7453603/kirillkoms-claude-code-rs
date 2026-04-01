@@ -67,8 +67,7 @@ pub static DOCTOR: CommandDef = CommandDef {
             lines.push(format!("  Shell:        {}", shell_status));
 
             // Check working directory is git repo
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let in_repo = cc_utils::git::is_git_repo(&cwd).await;
             lines.push(format!(
                 "  Git repo:     {}",
@@ -91,11 +90,7 @@ pub static DOCTOR: CommandDef = CommandDef {
             let has_claude_md = cc_config::claude_md::has_claude_md(&cwd);
             lines.push(format!(
                 "  CLAUDE.md:    {}",
-                if has_claude_md {
-                    "found"
-                } else {
-                    "not found"
-                }
+                if has_claude_md { "found" } else { "not found" }
             ));
 
             // Platform info
@@ -105,10 +100,7 @@ pub static DOCTOR: CommandDef = CommandDef {
                 std::env::consts::OS,
                 std::env::consts::ARCH
             ));
-            lines.push(format!(
-                "  Version:      {}",
-                env!("CARGO_PKG_VERSION")
-            ));
+            lines.push(format!("  Version:      {}", env!("CARGO_PKG_VERSION")));
 
             Ok(CommandOutput::message(&lines.join("\n")))
         })

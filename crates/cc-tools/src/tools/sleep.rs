@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -63,12 +63,11 @@ impl Tool for SleepTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let duration_ms = input
-            .get("duration_ms")
-            .and_then(|v| v.as_u64())
-            .ok_or(ToolError::ValidationFailed {
+        let duration_ms = input.get("duration_ms").and_then(|v| v.as_u64()).ok_or(
+            ToolError::ValidationFailed {
                 message: "Missing 'duration_ms' parameter".into(),
-            })?;
+            },
+        )?;
 
         if duration_ms > 300_000 {
             return Ok(ToolResult::error(

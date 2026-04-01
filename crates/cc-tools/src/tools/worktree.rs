@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -69,7 +69,13 @@ impl Tool for EnterWorktreeTool {
         let worktree_path = cwd.join("..").join(&name);
 
         let output = tokio::process::Command::new("git")
-            .args(["worktree", "add", "-b", &name, worktree_path.to_str().unwrap_or(&name)])
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                &name,
+                worktree_path.to_str().unwrap_or(&name),
+            ])
             .current_dir(&cwd)
             .output()
             .await
@@ -155,18 +161,20 @@ impl Tool for ExitWorktreeTool {
         match input.get("action").and_then(|v| v.as_str()) {
             Some("keep") | Some("remove") => ValidationResult::Ok,
             _ => ValidationResult::Error {
-                message: "Missing or invalid 'action' parameter. Must be 'keep' or 'remove'.".to_string(),
+                message: "Missing or invalid 'action' parameter. Must be 'keep' or 'remove'."
+                    .to_string(),
             },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let action = input
-            .get("action")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'action' parameter".into(),
-            })?;
+        let action =
+            input
+                .get("action")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'action' parameter".into(),
+                })?;
 
         let discard = input
             .get("discard_changes")

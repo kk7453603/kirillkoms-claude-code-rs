@@ -14,7 +14,11 @@ pub static VERSION: CommandDef = CommandDef {
                 version,
                 std::env::consts::OS,
                 std::env::consts::ARCH,
-                if cfg!(debug_assertions) { "debug" } else { "release" },
+                if cfg!(debug_assertions) {
+                    "debug"
+                } else {
+                    "release"
+                },
             );
             Ok(CommandOutput::message(&msg))
         })

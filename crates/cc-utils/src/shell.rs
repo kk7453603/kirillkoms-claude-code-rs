@@ -327,14 +327,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_shell_simple() {
-        let output = execute_shell(
-            "echo test",
-            Path::new("/tmp"),
-            Duration::from_secs(5),
-            None,
-        )
-        .await
-        .unwrap();
+        let output = execute_shell("echo test", Path::new("/tmp"), Duration::from_secs(5), None)
+            .await
+            .unwrap();
         assert_eq!(output.stdout.trim(), "test");
         assert_eq!(output.exit_code, 0);
     }
@@ -356,14 +351,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_shell_nonzero_exit() {
-        let output = execute_shell(
-            "exit 42",
-            Path::new("/tmp"),
-            Duration::from_secs(5),
-            None,
-        )
-        .await
-        .unwrap();
+        let output = execute_shell("exit 42", Path::new("/tmp"), Duration::from_secs(5), None)
+            .await
+            .unwrap();
         assert_eq!(output.exit_code, 42);
     }
 }

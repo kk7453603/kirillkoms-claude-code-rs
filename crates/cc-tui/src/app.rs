@@ -152,7 +152,7 @@ impl App {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(3),   // messages
+                Constraint::Min(3),    // messages
                 Constraint::Length(3), // input
                 Constraint::Length(1), // status bar
             ])
@@ -204,13 +204,12 @@ impl App {
             AppMode::Normal | AppMode::Scrolling => "-- SCROLL -- (i to type)",
             AppMode::PermissionPrompt => "Permission Required",
         };
-        let input_widget = Paragraph::new(self.input.content())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(input_title)
-                    .border_style(Style::default().fg(self.theme.border_color)),
-            );
+        let input_widget = Paragraph::new(self.input.content()).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(input_title)
+                .border_style(Style::default().fg(self.theme.border_color)),
+        );
         frame.render_widget(input_widget, chunks[1]);
 
         // Status bar

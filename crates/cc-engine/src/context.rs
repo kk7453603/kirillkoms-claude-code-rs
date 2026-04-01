@@ -20,10 +20,7 @@ impl SystemContext {
         let git_branch = cc_utils::git::current_branch(project_root).await.ok();
         let git_status = cc_utils::git::git_status(project_root).await.ok();
 
-        let cwd = project_root
-            .to_str()
-            .unwrap_or(".")
-            .to_string();
+        let cwd = project_root.to_str().unwrap_or(".").to_string();
 
         let os = std::env::consts::OS.to_string();
         let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
@@ -70,9 +67,10 @@ impl SystemContext {
             }
 
             if let Some(status) = &self.git_status
-                && !status.trim().is_empty() {
-                    parts.push(format!("Git status:\n{}", status));
-                }
+                && !status.trim().is_empty()
+            {
+                parts.push(format!("Git status:\n{}", status));
+            }
 
             blocks.push(SystemBlock::Text {
                 text: parts.join("\n\n"),
@@ -126,7 +124,10 @@ mod tests {
         // Should have at least the default system block
         assert!(!blocks.is_empty());
         match &blocks[0] {
-            SystemBlock::Text { text, cache_control } => {
+            SystemBlock::Text {
+                text,
+                cache_control,
+            } => {
                 assert!(text.contains("Claude"));
                 assert!(cache_control.is_some());
             }
@@ -167,7 +168,10 @@ mod tests {
         let blocks = ctx.to_system_blocks();
         assert_eq!(blocks.len(), 2);
         match &blocks[1] {
-            SystemBlock::Text { text, cache_control } => {
+            SystemBlock::Text {
+                text,
+                cache_control,
+            } => {
                 assert!(text.contains("Always use Rust."));
                 assert!(text.contains("CLAUDE.md"));
                 assert!(cache_control.is_some());

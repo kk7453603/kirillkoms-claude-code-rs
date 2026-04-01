@@ -1,3 +1,3 @@
-pub mod loader;
 pub mod bundled;
+pub mod loader;
 pub mod plugin;

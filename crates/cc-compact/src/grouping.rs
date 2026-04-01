@@ -52,7 +52,10 @@ pub fn group_messages(message_count: usize, token_estimates: &[usize]) -> Vec<Me
 
     // Mark the last `non_compactable_tail` groups as non-compactable
     let len = groups.len();
-    for group in groups.iter_mut().skip(len.saturating_sub(non_compactable_tail)) {
+    for group in groups
+        .iter_mut()
+        .skip(len.saturating_sub(non_compactable_tail))
+    {
         group.is_compactable = false;
     }
 

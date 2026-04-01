@@ -43,9 +43,7 @@ pub fn append_entry(path: &Path, entry: &TranscriptEntry) -> Result<(), std::io:
 /// Read all entries from a transcript JSONL file.
 pub fn read_entries(path: &Path) -> Result<Vec<TranscriptEntry>, PersistenceError> {
     if !path.exists() {
-        return Err(PersistenceError::NotFound(
-            path.display().to_string(),
-        ));
+        return Err(PersistenceError::NotFound(path.display().to_string()));
     }
 
     let content = std::fs::read_to_string(path)?;
@@ -111,7 +109,10 @@ mod tests {
         std::fs::write(&path, "not json\n").unwrap();
 
         let result = read_entries(&path);
-        assert!(matches!(result, Err(PersistenceError::Parse { line: 1, .. })));
+        assert!(matches!(
+            result,
+            Err(PersistenceError::Parse { line: 1, .. })
+        ));
     }
 
     #[test]

@@ -115,11 +115,7 @@ pub async fn execute_single_tool_with_context(
     let tool_name = tool.name().to_string();
 
     // 1. Run PreToolUse hooks
-    let pre_input = events::pre_tool_use_input(
-        &tool_name,
-        &input,
-        exec_ctx.session_id.as_deref(),
-    );
+    let pre_input = events::pre_tool_use_input(&tool_name, &input, exec_ctx.session_id.as_deref());
     let pre_result = dispatch_hooks(
         &exec_ctx.hooks_config,
         HookEventType::PreToolUse,
@@ -133,10 +129,7 @@ pub async fn execute_single_tool_with_context(
             return ToolCallResult {
                 tool_use_id: tool_use_id.to_string(),
                 tool_name,
-                result: Ok(ToolResult::error(&format!(
-                    "Blocked by hook: {}",
-                    reason
-                ))),
+                result: Ok(ToolResult::error(&format!("Blocked by hook: {}", reason))),
                 duration_ms: 0,
             };
         }
@@ -160,10 +153,7 @@ pub async fn execute_single_tool_with_context(
             return ToolCallResult {
                 tool_use_id: tool_use_id.to_string(),
                 tool_name,
-                result: Ok(ToolResult::error(&format!(
-                    "Permission denied: {}",
-                    reason
-                ))),
+                result: Ok(ToolResult::error(&format!("Permission denied: {}", reason))),
                 duration_ms: 0,
             };
         }
@@ -303,8 +293,7 @@ mod tests {
             name: "test_tool".to_string(),
             read_only: true,
         });
-        let result =
-            execute_single_tool(tool, serde_json::json!({}), "tu_1").await;
+        let result = execute_single_tool(tool, serde_json::json!({}), "tu_1").await;
         assert_eq!(result.tool_use_id, "tu_1");
         assert_eq!(result.tool_name, "test_tool");
         assert!(result.result.is_ok());
@@ -316,8 +305,7 @@ mod tests {
     #[tokio::test]
     async fn test_execute_single_tool_failure() {
         let tool: Arc<dyn Tool> = Arc::new(FailingTool);
-        let result =
-            execute_single_tool(tool, serde_json::json!({}), "tu_2").await;
+        let result = execute_single_tool(tool, serde_json::json!({}), "tu_2").await;
         assert_eq!(result.tool_use_id, "tu_2");
         assert!(result.result.is_err());
     }
@@ -328,8 +316,7 @@ mod tests {
             name: "fast".to_string(),
             read_only: true,
         });
-        let result =
-            execute_single_tool(tool, serde_json::json!({}), "tu_3").await;
+        let result = execute_single_tool(tool, serde_json::json!({}), "tu_3").await;
         // Duration should be non-negative (might be 0 for very fast calls)
         assert!(result.duration_ms < 10_000);
     }
@@ -477,14 +464,9 @@ mod tests {
             read_only: false,
         });
 
-        let result = execute_single_tool_with_context(
-            tool,
-            serde_json::json!({}),
-            "tu_ask",
-            &exec_ctx,
-            &cb,
-        )
-        .await;
+        let result =
+            execute_single_tool_with_context(tool, serde_json::json!({}), "tu_ask", &exec_ctx, &cb)
+                .await;
 
         // AutoApprove says yes, so tool should execute
         assert!(result.result.is_ok());
@@ -588,14 +570,9 @@ mod tests {
             read_only: true,
         });
 
-        let result = execute_single_tool_with_context(
-            tool,
-            serde_json::json!({}),
-            "tu_ro",
-            &exec_ctx,
-            &cb,
-        )
-        .await;
+        let result =
+            execute_single_tool_with_context(tool, serde_json::json!({}), "tu_ro", &exec_ctx, &cb)
+                .await;
 
         // Read-only tool should be auto-allowed in Default mode
         assert!(result.result.is_ok());

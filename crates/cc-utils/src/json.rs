@@ -67,12 +67,8 @@ pub fn truncate_json(value: &Value, max_depth: usize) -> Value {
 fn truncate_recursive(value: &Value, current_depth: usize, max_depth: usize) -> Value {
     if current_depth >= max_depth {
         match value {
-            Value::Object(map) => {
-                Value::String(format!("{{...{} keys}}", map.len()))
-            }
-            Value::Array(arr) => {
-                Value::String(format!("[...{} items]", arr.len()))
-            }
+            Value::Object(map) => Value::String(format!("{{...{} keys}}", map.len())),
+            Value::Array(arr) => Value::String(format!("[...{} items]", arr.len())),
             other => other.clone(),
         }
     } else {
@@ -80,7 +76,12 @@ fn truncate_recursive(value: &Value, current_depth: usize, max_depth: usize) -> 
             Value::Object(map) => {
                 let truncated: serde_json::Map<String, Value> = map
                     .iter()
-                    .map(|(k, v)| (k.clone(), truncate_recursive(v, current_depth + 1, max_depth)))
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            truncate_recursive(v, current_depth + 1, max_depth),
+                        )
+                    })
                     .collect();
                 Value::Object(truncated)
             }

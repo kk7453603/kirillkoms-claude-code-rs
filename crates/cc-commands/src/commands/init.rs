@@ -8,8 +8,7 @@ pub static INIT: CommandDef = CommandDef {
     hidden: false,
     handler: |_args| {
         Box::pin(async {
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             let claude_dir = cwd.join(".claude");
             let claude_md = cwd.join("CLAUDE.md");
@@ -86,7 +85,10 @@ pub static INIT: CommandDef = CommandDef {
                 ));
             }
 
-            let mut lines = vec!["Project initialized for Claude Code:".to_string(), String::new()];
+            let mut lines = vec![
+                "Project initialized for Claude Code:".to_string(),
+                String::new(),
+            ];
             for action in &actions {
                 lines.push(format!("  {}", action));
             }

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use globset::{Glob, GlobMatcher};
 use regex::{Regex, RegexBuilder};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -42,7 +42,9 @@ fn type_to_globs(ty: &str) -> Option<Vec<&'static str>> {
         "go" => Some(vec!["*.go"]),
         "java" => Some(vec!["*.java"]),
         "c" => Some(vec!["*.c", "*.h"]),
-        "cpp" => Some(vec!["*.cpp", "*.cc", "*.cxx", "*.hpp", "*.hh", "*.hxx", "*.h"]),
+        "cpp" => Some(vec![
+            "*.cpp", "*.cc", "*.cxx", "*.hpp", "*.hh", "*.hxx", "*.h",
+        ]),
         "ruby" | "rb" => Some(vec!["*.rb"]),
         "php" => Some(vec!["*.php"]),
         "swift" => Some(vec!["*.swift"]),
@@ -200,12 +202,13 @@ impl Tool for GrepTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let pattern_str = input
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'pattern' parameter".into(),
-            })?;
+        let pattern_str =
+            input
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'pattern' parameter".into(),
+                })?;
 
         let search_path = input
             .get("path")
@@ -219,16 +222,16 @@ impl Tool for GrepTool {
             .unwrap_or("files_with_matches");
 
         let case_insensitive = input.get("-i").and_then(|v| v.as_bool()).unwrap_or(false);
-        let multiline = input.get("multiline").and_then(|v| v.as_bool()).unwrap_or(false);
+        let multiline = input
+            .get("multiline")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         let show_line_numbers = input.get("-n").and_then(|v| v.as_bool()).unwrap_or(true);
         let head_limit = input
             .get("head_limit")
             .and_then(|v| v.as_u64())
             .unwrap_or(250) as usize;
-        let offset = input
-            .get("offset")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
+        let offset = input.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
         // Context lines
         let context_c = input
@@ -264,7 +267,14 @@ impl Tool for GrepTool {
 
         // If path is a file, search just that file
         if search_path.is_file() {
-            let results = match search_file(&search_path, &re, output_mode, show_line_numbers, before_context, after_context) {
+            let results = match search_file(
+                &search_path,
+                &re,
+                output_mode,
+                show_line_numbers,
+                before_context,
+                after_context,
+            ) {
                 Ok(r) => r,
                 Err(()) => return Ok(ToolResult::text("")),
             };
@@ -304,17 +314,29 @@ impl Tool for GrepTool {
             let path = entry.path();
 
             // Apply glob/type filter
-            if !glob_matchers.is_empty() && !glob_matchers.iter().any(|m| m.is_match(path) || m.is_match(path.file_name().unwrap_or_default())) {
+            if !glob_matchers.is_empty()
+                && !glob_matchers
+                    .iter()
+                    .any(|m| m.is_match(path) || m.is_match(path.file_name().unwrap_or_default()))
+            {
                 continue;
             }
 
-            match search_file(path, &re, output_mode, show_line_numbers, before_context, after_context) {
+            match search_file(
+                path,
+                &re,
+                output_mode,
+                show_line_numbers,
+                before_context,
+                after_context,
+            ) {
                 Ok(result) if !result.is_empty() => all_results.push(result),
                 _ => continue,
             }
 
             // Early exit if we have way more results than needed
-            if output_mode == "files_with_matches" && all_results.len() > offset + head_limit + 100 {
+            if output_mode == "files_with_matches" && all_results.len() > offset + head_limit + 100
+            {
                 break;
             }
         }
@@ -352,7 +374,10 @@ fn build_glob_matchers(
             }
         } else {
             return Err(ToolError::ExecutionFailed {
-                message: format!("Unknown file type: '{}'. Common types: js, py, rust, go, java, ts, cpp, rb, php.", ty),
+                message: format!(
+                    "Unknown file type: '{}'. Common types: js, py, rust, go, java, ts, cpp, rb, php.",
+                    ty
+                ),
             });
         }
     }
@@ -461,11 +486,21 @@ fn search_file(
     }
 }
 
-fn format_results(result: &FileSearchResult, output_mode: &str, head_limit: usize, offset: usize) -> String {
+fn format_results(
+    result: &FileSearchResult,
+    output_mode: &str,
+    head_limit: usize,
+    offset: usize,
+) -> String {
     match output_mode {
-        "content" => {
-            result.lines.iter().skip(offset).take(head_limit).cloned().collect::<Vec<_>>().join("\n")
-        }
+        "content" => result
+            .lines
+            .iter()
+            .skip(offset)
+            .take(head_limit)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n"),
         "count" => {
             format!("{}:{}", result.path.display(), result.match_count)
         }
@@ -513,16 +548,14 @@ fn format_all_results(
             }
             output.join("\n")
         }
-        "count" => {
-            results
-                .iter()
-                .filter(|r| r.match_count > 0)
-                .skip(offset)
-                .take(head_limit)
-                .map(|r| format!("{}:{}", r.path.display(), r.match_count))
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
+        "count" => results
+            .iter()
+            .filter(|r| r.match_count > 0)
+            .skip(offset)
+            .take(head_limit)
+            .map(|r| format!("{}:{}", r.path.display(), r.match_count))
+            .collect::<Vec<_>>()
+            .join("\n"),
         _ => {
             // files_with_matches
             results

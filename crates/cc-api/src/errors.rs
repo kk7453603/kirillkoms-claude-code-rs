@@ -66,10 +66,7 @@ impl ApiError {
             413 => ApiError::PromptTooLong { message },
             400 => ApiError::InvalidRequest { message },
             529 => ApiError::Overloaded { message },
-            s if s >= 500 => ApiError::ServerError {
-                status: s,
-                message,
-            },
+            s if s >= 500 => ApiError::ServerError { status: s, message },
             _ => {
                 if error_type == "overloaded_error" {
                     ApiError::Overloaded { message }

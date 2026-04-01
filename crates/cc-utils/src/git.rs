@@ -56,11 +56,12 @@ pub async fn git_diff(cwd: &Path) -> Result<String, GitError> {
 
     if output.exit_code != 0 {
         // If HEAD doesn't exist (fresh repo), try plain diff
-        let output2 = execute_command("git", &["diff"], cwd)
-            .await
-            .map_err(|e| GitError::CommandFailed {
-                message: e.to_string(),
-            })?;
+        let output2 =
+            execute_command("git", &["diff"], cwd)
+                .await
+                .map_err(|e| GitError::CommandFailed {
+                    message: e.to_string(),
+                })?;
         return Ok(output2.stdout);
     }
 
@@ -70,15 +71,11 @@ pub async fn git_diff(cwd: &Path) -> Result<String, GitError> {
 /// Get recent commit log (last N).
 pub async fn git_log(cwd: &Path, count: usize) -> Result<String, GitError> {
     let count_str = format!("-{}", count);
-    let output = execute_command(
-        "git",
-        &["log", "--oneline", &count_str],
-        cwd,
-    )
-    .await
-    .map_err(|e| GitError::CommandFailed {
-        message: e.to_string(),
-    })?;
+    let output = execute_command("git", &["log", "--oneline", &count_str], cwd)
+        .await
+        .map_err(|e| GitError::CommandFailed {
+            message: e.to_string(),
+        })?;
 
     if output.exit_code != 0 {
         return Err(GitError::CommandFailed {
@@ -115,15 +112,11 @@ pub async fn repo_root(cwd: &Path) -> Result<PathBuf, GitError> {
 
 /// Get list of changed files.
 pub async fn changed_files(cwd: &Path) -> Result<Vec<String>, GitError> {
-    let output = execute_command(
-        "git",
-        &["status", "--short", "--porcelain"],
-        cwd,
-    )
-    .await
-    .map_err(|e| GitError::CommandFailed {
-        message: e.to_string(),
-    })?;
+    let output = execute_command("git", &["status", "--short", "--porcelain"], cwd)
+        .await
+        .map_err(|e| GitError::CommandFailed {
+            message: e.to_string(),
+        })?;
 
     if output.exit_code != 0 {
         return Err(GitError::CommandFailed {

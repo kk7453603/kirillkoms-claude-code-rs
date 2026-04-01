@@ -178,39 +178,34 @@ impl ApiClient for DirectApiClient {
             message: format!("Failed to serialize request: {}", e),
         })?;
 
-        let response = self
-            .http
-            .post(&url)
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    ApiError::Timeout
-                } else if e.is_connect() {
-                    ApiError::ConnectionError {
-                        message: e.to_string(),
-                    }
-                } else {
-                    ApiError::ConnectionError {
-                        message: e.to_string(),
-                    }
+        let response = self.http.post(&url).body(body).send().await.map_err(|e| {
+            if e.is_timeout() {
+                ApiError::Timeout
+            } else if e.is_connect() {
+                ApiError::ConnectionError {
+                    message: e.to_string(),
                 }
-            })?;
+            } else {
+                ApiError::ConnectionError {
+                    message: e.to_string(),
+                }
+            }
+        })?;
 
         let status = response.status().as_u16();
-        let body_text = response.text().await.map_err(|e| ApiError::ConnectionError {
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let body_text = response
+            .text()
+            .await
+            .map_err(|e| ApiError::ConnectionError {
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         if status != 200 {
             return Err(ApiError::from_status(status, &body_text));
         }
 
-        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| {
-            ApiError::InvalidRequest {
-                message: format!("Failed to parse response: {}", e),
-            }
+        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| ApiError::InvalidRequest {
+            message: format!("Failed to parse response: {}", e),
         })
     }
 }
@@ -258,10 +253,7 @@ mod tests {
             timeout_secs: 600,
         };
         let client = DirectApiClient::new(config).unwrap();
-        assert_eq!(
-            client.messages_url(),
-            "https://custom.api.com/v1/messages"
-        );
+        assert_eq!(client.messages_url(), "https://custom.api.com/v1/messages");
     }
 
     #[tokio::test]

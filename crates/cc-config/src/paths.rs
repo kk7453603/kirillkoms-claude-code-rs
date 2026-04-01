@@ -87,7 +87,10 @@ mod tests {
     fn project_settings_path_correct() {
         let root = Path::new("/home/user/myproject");
         let p = project_settings_path(root);
-        assert_eq!(p, PathBuf::from("/home/user/myproject/.claude/settings.json"));
+        assert_eq!(
+            p,
+            PathBuf::from("/home/user/myproject/.claude/settings.json")
+        );
     }
 
     #[test]
@@ -118,7 +121,10 @@ mod tests {
         let paths = claude_md_paths(root);
         assert!(!paths.is_empty());
         // Should include project root paths first
-        assert_eq!(paths[0], PathBuf::from("/home/user/myproject/.claude/CLAUDE.md"));
+        assert_eq!(
+            paths[0],
+            PathBuf::from("/home/user/myproject/.claude/CLAUDE.md")
+        );
         assert_eq!(paths[1], PathBuf::from("/home/user/myproject/CLAUDE.md"));
     }
 
@@ -127,9 +133,9 @@ mod tests {
         let root = Path::new("/home/user/myproject/subdir");
         let paths = claude_md_paths(root);
         // Should include parent directories
-        let has_parent = paths.iter().any(|p| {
-            p == &PathBuf::from("/home/user/myproject/CLAUDE.md")
-        });
+        let has_parent = paths
+            .iter()
+            .any(|p| p == &PathBuf::from("/home/user/myproject/CLAUDE.md"));
         assert!(has_parent, "Should include parent directory CLAUDE.md");
     }
 }

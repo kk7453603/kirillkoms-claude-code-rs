@@ -9,8 +9,7 @@ pub static CONTEXT: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             match args.as_str() {
                 "" | "show" => {
@@ -20,15 +19,11 @@ pub static CONTEXT: CommandDef = CommandDef {
                     lines.push(format!("  Working directory: {}", cwd.display()));
 
                     // CLAUDE.md files
-                    let claude_files =
-                        cc_config::claude_md::discover_claude_md_files(&cwd);
+                    let claude_files = cc_config::claude_md::discover_claude_md_files(&cwd);
                     if claude_files.is_empty() {
                         lines.push("  CLAUDE.md files:   none".to_string());
                     } else {
-                        lines.push(format!(
-                            "  CLAUDE.md files:   {}",
-                            claude_files.len()
-                        ));
+                        lines.push(format!("  CLAUDE.md files:   {}", claude_files.len()));
                         for f in &claude_files {
                             let size = std::fs::metadata(f)
                                 .map(|m| cc_utils::format::format_bytes(m.len()))
@@ -53,10 +48,7 @@ pub static CONTEXT: CommandDef = CommandDef {
                     // Git info
                     if cc_utils::git::is_git_repo(&cwd).await {
                         if let Ok(root) = cc_utils::git::repo_root(&cwd).await {
-                            lines.push(format!(
-                                "  Git root:          {}",
-                                root.display()
-                            ));
+                            lines.push(format!("  Git root:          {}", root.display()));
                         }
                     }
 

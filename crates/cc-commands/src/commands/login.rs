@@ -26,26 +26,20 @@ pub static LOGIN: CommandDef = CommandDef {
 
             let provider = env_cfg.provider();
             match provider {
-                cc_config::env::ApiProvider::Bedrock => {
-                    Ok(CommandOutput::message(
-                        "Using AWS Bedrock provider.\n\
+                cc_config::env::ApiProvider::Bedrock => Ok(CommandOutput::message(
+                    "Using AWS Bedrock provider.\n\
                          Configure authentication via AWS credentials (AWS_PROFILE, etc.).",
-                    ))
-                }
-                cc_config::env::ApiProvider::Vertex => {
-                    Ok(CommandOutput::message(
-                        "Using Google Vertex AI provider.\n\
+                )),
+                cc_config::env::ApiProvider::Vertex => Ok(CommandOutput::message(
+                    "Using Google Vertex AI provider.\n\
                          Configure via gcloud auth or GOOGLE_APPLICATION_CREDENTIALS.",
-                    ))
-                }
-                _ => {
-                    Ok(CommandOutput::message(
-                        "Not authenticated.\n\n\
+                )),
+                _ => Ok(CommandOutput::message(
+                    "Not authenticated.\n\n\
                          Set your API key:\n  \
                          export ANTHROPIC_API_KEY=sk-ant-...\n\n\
                          Or visit https://console.anthropic.com/settings/keys to get one.",
-                    ))
-                }
+                )),
             }
         })
     },

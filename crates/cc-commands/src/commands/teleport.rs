@@ -10,8 +10,7 @@ pub static TELEPORT: CommandDef = CommandDef {
         let args = args.trim().to_string();
         Box::pin(async move {
             if args.is_empty() {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 return Ok(CommandOutput::message(&format!(
                     "Current directory: {}\n\nUsage: /teleport <path>",
                     cwd.display()
@@ -22,8 +21,7 @@ pub static TELEPORT: CommandDef = CommandDef {
             let resolved = if path.is_absolute() {
                 path
             } else {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 cwd.join(&path)
             };
 

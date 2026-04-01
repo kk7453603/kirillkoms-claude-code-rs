@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -66,16 +66,14 @@ impl Tool for SkillTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let skill_name = input
-            .get("skill")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'skill' parameter".into(),
-            })?;
-        let args = input
-            .get("args")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let skill_name =
+            input
+                .get("skill")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'skill' parameter".into(),
+                })?;
+        let args = input.get("args").and_then(|v| v.as_str()).unwrap_or("");
 
         // Look up in bundled skills
         let skills = cc_skills::bundled::bundled_skills();
@@ -152,19 +150,14 @@ mod tests {
     #[tokio::test]
     async fn test_call_unknown_skill() {
         let tool = SkillTool::new();
-        let result = tool
-            .call(json!({"skill": "nonexistent"}))
-            .await;
+        let result = tool.call(json!({"skill": "nonexistent"})).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_call_skill_no_args() {
         let tool = SkillTool::new();
-        let result = tool
-            .call(json!({"skill": "review-pr"}))
-            .await
-            .unwrap();
+        let result = tool.call(json!({"skill": "review-pr"})).await.unwrap();
         assert!(!result.is_error);
         assert!(result.content.as_str().unwrap().contains("review-pr"));
     }

@@ -37,7 +37,10 @@ impl FileHistory {
             old_content,
             new_content,
         };
-        self.edits.entry(path.to_path_buf()).or_default().push(entry);
+        self.edits
+            .entry(path.to_path_buf())
+            .or_default()
+            .push(entry);
     }
 
     /// Get the edit history for a specific file.
@@ -89,12 +92,7 @@ mod tests {
         let mut history = FileHistory::new();
         let path = Path::new("/tmp/test.rs");
         history.record_edit(path, "Write", None, "v1".to_string());
-        history.record_edit(
-            path,
-            "Edit",
-            Some("v1".to_string()),
-            "v2".to_string(),
-        );
+        history.record_edit(path, "Edit", Some("v1".to_string()), "v2".to_string());
 
         let edits = history.get_history(path).unwrap();
         assert_eq!(edits.len(), 2);
@@ -115,7 +113,12 @@ mod tests {
         let mut history = FileHistory::new();
         let path = Path::new("/tmp/test.rs");
         history.record_edit(path, "Write", None, "first".to_string());
-        history.record_edit(path, "Edit", Some("first".to_string()), "second".to_string());
+        history.record_edit(
+            path,
+            "Edit",
+            Some("first".to_string()),
+            "second".to_string(),
+        );
 
         let last = history.last_edit(path).unwrap();
         assert_eq!(last.tool_name, "Edit");

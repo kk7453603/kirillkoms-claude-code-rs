@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use cc_mcp::client::{McpClient, StdioMcpClient};
@@ -8,9 +8,8 @@ use crate::trait_def::{SearchReadInfo, Tool, ToolError, ToolResult, ValidationRe
 
 /// Global registry of connected MCP clients.
 /// Tools register clients here; MCP tools look them up by server name.
-static MCP_CLIENTS: LazyLock<Mutex<Vec<(String, Arc<StdioMcpClient>)>>> = LazyLock::new(|| {
-    Mutex::new(Vec::new())
-});
+static MCP_CLIENTS: LazyLock<Mutex<Vec<(String, Arc<StdioMcpClient>)>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 /// Register a connected MCP client in the global registry.
 pub fn register_mcp_client(name: String, client: Arc<StdioMcpClient>) {
@@ -34,7 +33,10 @@ pub fn registered_mcp_servers() -> Vec<String> {
 
 fn get_client(name: &str) -> Option<Arc<StdioMcpClient>> {
     let clients = MCP_CLIENTS.lock().unwrap();
-    clients.iter().find(|(n, _)| n == name).map(|(_, c)| c.clone())
+    clients
+        .iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, c)| c.clone())
 }
 
 fn get_all_clients() -> Vec<(String, Arc<StdioMcpClient>)> {
@@ -253,10 +255,17 @@ impl Tool for ReadMcpResourceTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let server_name = input.get("server_name").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'server_name' parameter".into() })?;
-        let uri = input.get("uri").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'uri' parameter".into() })?;
+        let server_name = input.get("server_name").and_then(|v| v.as_str()).ok_or(
+            ToolError::ValidationFailed {
+                message: "Missing 'server_name' parameter".into(),
+            },
+        )?;
+        let uri = input
+            .get("uri")
+            .and_then(|v| v.as_str())
+            .ok_or(ToolError::ValidationFailed {
+                message: "Missing 'uri' parameter".into(),
+            })?;
 
         let client = get_client(server_name).ok_or_else(|| {
             let servers = registered_mcp_servers();
@@ -275,9 +284,14 @@ impl Tool for ReadMcpResourceTool {
             }
         })?;
 
-        let result = client.read_resource(uri).await
+        let result = client
+            .read_resource(uri)
+            .await
             .map_err(|e| ToolError::ExecutionFailed {
-                message: format!("Failed to read resource '{}' from '{}': {}", uri, server_name, e),
+                message: format!(
+                    "Failed to read resource '{}' from '{}': {}",
+                    uri, server_name, e
+                ),
             })?;
 
         let json_str = serde_json::to_string_pretty(&result)
@@ -338,9 +352,7 @@ mod tests {
     #[tokio::test]
     async fn test_read_no_servers() {
         let tool = ReadMcpResourceTool::new();
-        let result = tool
-            .call(json!({"server_name": "s", "uri": "u"}))
-            .await;
+        let result = tool.call(json!({"server_name": "s", "uri": "u"})).await;
         assert!(result.is_err());
     }
 

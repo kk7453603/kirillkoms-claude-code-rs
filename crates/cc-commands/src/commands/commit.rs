@@ -9,20 +9,16 @@ pub static COMMIT: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             if !cc_utils::git::is_git_repo(&cwd).await {
                 return Ok(CommandOutput::message("Not in a git repository."));
             }
 
             // Check for staged changes
-            let status_output = cc_utils::shell::execute_command(
-                "git",
-                &["diff", "--cached", "--stat"],
-                &cwd,
-            )
-            .await;
+            let status_output =
+                cc_utils::shell::execute_command("git", &["diff", "--cached", "--stat"], &cwd)
+                    .await;
 
             let has_staged = match &status_output {
                 Ok(out) => out.exit_code == 0 && !out.stdout.trim().is_empty(),
@@ -45,40 +41,26 @@ pub static COMMIT: CommandDef = CommandDef {
 
             if !args.is_empty() {
                 // Use provided message
-                let result = cc_utils::shell::execute_command(
-                    "git",
-                    &["commit", "-m", &args],
-                    &cwd,
-                )
-                .await;
+                let result =
+                    cc_utils::shell::execute_command("git", &["commit", "-m", &args], &cwd).await;
                 match result {
-                    Ok(out) if out.exit_code == 0 => {
-                        Ok(CommandOutput::message(&format!(
-                            "Committed with message: {}\n{}",
-                            args,
-                            out.stdout.trim()
-                        )))
-                    }
+                    Ok(out) if out.exit_code == 0 => Ok(CommandOutput::message(&format!(
+                        "Committed with message: {}\n{}",
+                        args,
+                        out.stdout.trim()
+                    ))),
                     Ok(out) => Ok(CommandOutput::message(&format!(
                         "Commit failed: {}",
                         out.stderr.trim()
                     ))),
-                    Err(e) => Ok(CommandOutput::message(&format!(
-                        "Commit failed: {}",
-                        e
-                    ))),
+                    Err(e) => Ok(CommandOutput::message(&format!("Commit failed: {}", e))),
                 }
             } else {
                 // Show staged diff for AI to generate message
-                let staged = cc_utils::shell::execute_command(
-                    "git",
-                    &["diff", "--cached", "--stat"],
-                    &cwd,
-                )
-                .await;
-                let stat_info = staged
-                    .map(|o| o.stdout)
-                    .unwrap_or_else(|_| String::new());
+                let staged =
+                    cc_utils::shell::execute_command("git", &["diff", "--cached", "--stat"], &cwd)
+                        .await;
+                let stat_info = staged.map(|o| o.stdout).unwrap_or_else(|_| String::new());
 
                 Ok(CommandOutput::message(&format!(
                     "Staged changes:\n{}\n\

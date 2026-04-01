@@ -1,13 +1,13 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use cc_utils::lsp::{
-    detect_language, default_server_for_language, LspClient, Location, Position, StdioLspClient,
-};
 use crate::trait_def::{SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult};
+use cc_utils::lsp::{
+    Location, LspClient, Position, StdioLspClient, default_server_for_language, detect_language,
+};
 
 pub struct LspTool {
     clients: Arc<Mutex<HashMap<String, Arc<StdioLspClient>>>>,
@@ -23,11 +23,10 @@ impl LspTool {
     /// Get or create a client for the given language.
     async fn get_client(&self, file_path: &str) -> Result<Arc<StdioLspClient>, ToolError> {
         let lang = detect_language(file_path);
-        let (cmd, args) = default_server_for_language(lang).ok_or_else(|| {
-            ToolError::ExecutionFailed {
+        let (cmd, args) =
+            default_server_for_language(lang).ok_or_else(|| ToolError::ExecutionFailed {
                 message: format!("No LSP server configured for language '{}'", lang),
-            }
-        })?;
+            })?;
 
         let mut clients = self.clients.lock().await;
         if let Some(client) = clients.get(lang) {
@@ -48,9 +47,12 @@ impl LspTool {
             root_uri,
         ));
 
-        client.connect().await.map_err(|e| ToolError::ExecutionFailed {
-            message: format!("Failed to connect to {} LSP server: {}", lang, e),
-        })?;
+        client
+            .connect()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                message: format!("Failed to connect to {} LSP server: {}", lang, e),
+            })?;
 
         clients.insert(lang.to_string(), Arc::clone(&client));
         Ok(client)
@@ -72,9 +74,7 @@ fn format_locations(locations: &[Location]) -> String {
         .map(|loc| {
             format!(
                 "{}:{}:{}",
-                loc.uri
-                    .strip_prefix("file://")
-                    .unwrap_or(&loc.uri),
+                loc.uri.strip_prefix("file://").unwrap_or(&loc.uri),
                 loc.range.start.line + 1,
                 loc.range.start.character + 1,
             )
@@ -200,18 +200,9 @@ impl Tool for LspTool {
             .get("operation")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
-        let file_path = input
-            .get("filePath")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let line = input
-            .get("line")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32;
-        let character = input
-            .get("character")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as u32;
+        let file_path = input.get("filePath").and_then(|v| v.as_str()).unwrap_or("");
+        let line = input.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let character = input.get("character").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
         let client = match self.get_client(file_path).await {
             Ok(c) => c,
@@ -226,18 +217,14 @@ impl Tool for LspTool {
         let pos = Position { line, character };
 
         match operation {
-            "goToDefinition" => {
-                match client.go_to_definition(file_path, pos).await {
-                    Ok(locs) => Ok(ToolResult::text(&format_locations(&locs))),
-                    Err(e) => Ok(ToolResult::error(&format!("goToDefinition failed: {}", e))),
-                }
-            }
-            "findReferences" => {
-                match client.find_references(file_path, pos).await {
-                    Ok(locs) => Ok(ToolResult::text(&format_locations(&locs))),
-                    Err(e) => Ok(ToolResult::error(&format!("findReferences failed: {}", e))),
-                }
-            }
+            "goToDefinition" => match client.go_to_definition(file_path, pos).await {
+                Ok(locs) => Ok(ToolResult::text(&format_locations(&locs))),
+                Err(e) => Ok(ToolResult::error(&format!("goToDefinition failed: {}", e))),
+            },
+            "findReferences" => match client.find_references(file_path, pos).await {
+                Ok(locs) => Ok(ToolResult::text(&format_locations(&locs))),
+                Err(e) => Ok(ToolResult::error(&format!("findReferences failed: {}", e))),
+            },
             "hover" => match client.hover(file_path, pos).await {
                 Ok(Some(hover)) => Ok(ToolResult::text(&hover.contents)),
                 Ok(None) => Ok(ToolResult::text("No hover information available.")),
@@ -264,16 +251,10 @@ impl Tool for LspTool {
                         Ok(ToolResult::text(&text))
                     }
                 }
-                Err(e) => Ok(ToolResult::error(&format!(
-                    "documentSymbols failed: {}",
-                    e
-                ))),
+                Err(e) => Ok(ToolResult::error(&format!("documentSymbols failed: {}", e))),
             },
             "workspaceSymbols" => {
-                let query = input
-                    .get("query")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
                 match client.workspace_symbols(query).await {
                     Ok(symbols) => {
                         if symbols.is_empty() {
@@ -358,7 +339,9 @@ mod tests {
     async fn test_call_unsupported_language() {
         let tool = LspTool::new();
         let result = tool
-            .call(json!({"operation": "hover", "filePath": "/tmp/t.txt", "line": 1, "character": 5}))
+            .call(
+                json!({"operation": "hover", "filePath": "/tmp/t.txt", "line": 1, "character": 5}),
+            )
             .await
             .unwrap();
         assert!(result.is_error);

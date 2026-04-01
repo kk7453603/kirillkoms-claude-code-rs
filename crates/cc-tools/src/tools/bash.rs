@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{
     InterruptBehavior, RenderedContent, SearchReadInfo, Tool, ToolError, ToolResult,
@@ -56,10 +56,7 @@ impl Tool for BashTool {
     }
 
     fn is_read_only(&self, input: &Value) -> bool {
-        let cmd = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let cmd = input.get("command").and_then(|v| v.as_str()).unwrap_or("");
         cc_permissions::bash_security::analyze_command(cmd).is_read_only
     }
 
@@ -68,10 +65,7 @@ impl Tool for BashTool {
     }
 
     fn is_destructive(&self, input: &Value) -> bool {
-        let cmd = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let cmd = input.get("command").and_then(|v| v.as_str()).unwrap_or("");
         cc_permissions::bash_security::analyze_command(cmd).is_destructive
     }
 
@@ -89,10 +83,7 @@ impl Tool for BashTool {
     }
 
     fn search_read_info(&self, input: &Value) -> SearchReadInfo {
-        let cmd = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let cmd = input.get("command").and_then(|v| v.as_str()).unwrap_or("");
         let lower = cmd.to_lowercase();
         SearchReadInfo {
             is_search: lower.starts_with("grep")
@@ -121,12 +112,13 @@ impl Tool for BashTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let command = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'command' parameter".into(),
-            })?;
+        let command =
+            input
+                .get("command")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'command' parameter".into(),
+                })?;
 
         let timeout_ms = input
             .get("timeout")
@@ -139,15 +131,13 @@ impl Tool for BashTool {
             .current_dir(std::env::current_dir().unwrap_or_default())
             .output();
 
-        let output = tokio::time::timeout(
-            std::time::Duration::from_millis(timeout_ms),
-            output_future,
-        )
-        .await
-        .map_err(|_| ToolError::Timeout { timeout_ms })?
-        .map_err(|e| ToolError::ExecutionFailed {
-            message: e.to_string(),
-        })?;
+        let output =
+            tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), output_future)
+                .await
+                .map_err(|_| ToolError::Timeout { timeout_ms })?
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: e.to_string(),
+                })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);

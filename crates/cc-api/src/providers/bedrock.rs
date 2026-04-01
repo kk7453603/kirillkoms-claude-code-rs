@@ -52,12 +52,7 @@ impl BedrockApiClient {
     /// compute HMAC-SHA256 based signatures over the request headers and body.
     /// Returns a set of headers that would normally contain Authorization,
     /// X-Amz-Date, and optionally X-Amz-Security-Token.
-    fn sign_request_v4(
-        &self,
-        _method: &str,
-        _url: &str,
-        _body: &str,
-    ) -> Vec<(String, String)> {
+    fn sign_request_v4(&self, _method: &str, _url: &str, _body: &str) -> Vec<(String, String)> {
         let now = chrono::Utc::now();
         let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
         let date_stamp = now.format("%Y%m%d").to_string();
@@ -203,18 +198,19 @@ impl ApiClient for BedrockApiClient {
         })?;
 
         let status = response.status().as_u16();
-        let body_text = response.text().await.map_err(|e| ApiError::ConnectionError {
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let body_text = response
+            .text()
+            .await
+            .map_err(|e| ApiError::ConnectionError {
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         if status != 200 {
             return Err(ApiError::from_status(status, &body_text));
         }
 
-        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| {
-            ApiError::InvalidRequest {
-                message: format!("Failed to parse response: {}", e),
-            }
+        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| ApiError::InvalidRequest {
+            message: format!("Failed to parse response: {}", e),
         })
     }
 }
@@ -232,10 +228,7 @@ mod tests {
         assert!(client.is_ok());
         let client = client.unwrap();
         assert_eq!(client.region, "us-east-1");
-        assert_eq!(
-            client.model_id,
-            "anthropic.claude-3-sonnet-20240229-v1:0"
-        );
+        assert_eq!(client.model_id, "anthropic.claude-3-sonnet-20240229-v1:0");
     }
 
     #[test]

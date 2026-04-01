@@ -19,16 +19,10 @@ pub static REVIEW: CommandDef = CommandDef {
                 ));
             }
 
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             // Check if gh CLI is available
-            let gh_check = cc_utils::shell::execute_command(
-                "gh",
-                &["--version"],
-                &cwd,
-            )
-            .await;
+            let gh_check = cc_utils::shell::execute_command("gh", &["--version"], &cwd).await;
 
             if gh_check.is_err() || gh_check.as_ref().is_ok_and(|o| o.exit_code != 0) {
                 return Ok(CommandOutput::message(
@@ -46,7 +40,13 @@ pub static REVIEW: CommandDef = CommandDef {
 
             let result = cc_utils::shell::execute_command(
                 "gh",
-                &["pr", "view", &pr_ref, "--json", "title,body,state,additions,deletions,changedFiles"],
+                &[
+                    "pr",
+                    "view",
+                    &pr_ref,
+                    "--json",
+                    "title,body,state,additions,deletions,changedFiles",
+                ],
                 &cwd,
             )
             .await;

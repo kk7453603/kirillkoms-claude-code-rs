@@ -10,8 +10,7 @@ pub static PERMISSIONS: CommandDef = CommandDef {
         let args = args.trim().to_string();
         Box::pin(async move {
             if args.is_empty() {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 let settings = cc_config::settings::load_all_settings(Some(&cwd));
 
                 let mut lines = vec!["Permission Settings".to_string(), String::new()];
@@ -41,7 +40,8 @@ pub static PERMISSIONS: CommandDef = CommandDef {
                             }
                         }
                     } else {
-                        lines.push("  No permission rules configured (using defaults).".to_string());
+                        lines
+                            .push("  No permission rules configured (using defaults).".to_string());
                     }
                 } else {
                     lines.push("  Using default permissions.".to_string());

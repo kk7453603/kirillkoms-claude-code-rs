@@ -10,8 +10,7 @@ pub static CONFIG: CommandDef = CommandDef {
         let args = args.trim().to_string();
         Box::pin(async move {
             if args.is_empty() {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
                 let mut lines = vec!["Configuration".to_string(), String::new()];
 
@@ -26,10 +25,8 @@ pub static CONFIG: CommandDef = CommandDef {
                                 .unwrap_or(cc_config::model_config::default_model())
                         ));
                         if let Some(ref perms) = s.permissions {
-                            let allow_count =
-                                perms.allow.as_ref().map(|v| v.len()).unwrap_or(0);
-                            let deny_count =
-                                perms.deny.as_ref().map(|v| v.len()).unwrap_or(0);
+                            let allow_count = perms.allow.as_ref().map(|v| v.len()).unwrap_or(0);
+                            let deny_count = perms.deny.as_ref().map(|v| v.len()).unwrap_or(0);
                             lines.push(format!(
                                 "  permissions:      {} allow, {} deny rules",
                                 allow_count, deny_count
@@ -39,18 +36,12 @@ pub static CONFIG: CommandDef = CommandDef {
                         }
                         if let Some(ref hooks) = s.hooks {
                             let total: usize = hooks.values().map(|v| v.len()).sum();
-                            lines.push(format!(
-                                "  hooks:            {} configured",
-                                total
-                            ));
+                            lines.push(format!("  hooks:            {} configured", total));
                         } else {
                             lines.push("  hooks:            none".to_string());
                         }
                         if let Some(ref env_map) = s.env {
-                            lines.push(format!(
-                                "  env vars:         {} set",
-                                env_map.len()
-                            ));
+                            lines.push(format!("  env vars:         {} set", env_map.len()));
                         }
                     }
                     Err(e) => {
@@ -82,20 +73,14 @@ pub static CONFIG: CommandDef = CommandDef {
                 [key] => {
                     let env_cfg = cc_config::env::EnvConfig::from_env();
                     let val = match *key {
-                        "model" => Some(
-                            env_cfg
-                                .model
-                                .unwrap_or_else(|| {
-                                    cc_config::model_config::default_model().to_string()
-                                }),
-                        ),
-                        "api_key" => {
-                            Some(if env_cfg.api_key.is_some() {
-                                "***configured***".to_string()
-                            } else {
-                                "not set".to_string()
-                            })
-                        }
+                        "model" => Some(env_cfg.model.unwrap_or_else(|| {
+                            cc_config::model_config::default_model().to_string()
+                        })),
+                        "api_key" => Some(if env_cfg.api_key.is_some() {
+                            "***configured***".to_string()
+                        } else {
+                            "not set".to_string()
+                        }),
                         "provider" => Some(format!("{:?}", env_cfg.provider())),
                         _ => None,
                     };

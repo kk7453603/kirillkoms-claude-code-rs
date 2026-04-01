@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 use crate::trait_def::{
@@ -99,19 +99,17 @@ impl Tool for FileReadTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let file_path = input
-            .get("file_path")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'file_path' parameter".into(),
-            })?;
+        let file_path =
+            input
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'file_path' parameter".into(),
+                })?;
 
         let path = Path::new(file_path);
         if !path.exists() {
-            return Ok(ToolResult::error(&format!(
-                "File not found: {}",
-                file_path
-            )));
+            return Ok(ToolResult::error(&format!("File not found: {}", file_path)));
         }
 
         if path.is_dir() {
@@ -121,11 +119,12 @@ impl Tool for FileReadTool {
             )));
         }
 
-        let content = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed {
-                message: format!("Failed to read file '{}': {}", file_path, e),
-            })?;
+        let content =
+            tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: format!("Failed to read file '{}': {}", file_path, e),
+                })?;
 
         let lines: Vec<&str> = content.lines().collect();
         let total_lines = lines.len();

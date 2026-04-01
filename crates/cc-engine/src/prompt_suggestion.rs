@@ -92,10 +92,7 @@ pub fn suggest_prompts(project_root: &Path) -> Vec<PromptSuggestion> {
     if let Ok(entries) = std::fs::read_dir(project_root) {
         let mut recent_files: Vec<_> = entries
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().is_file()
-                    && !e.file_name().to_string_lossy().starts_with('.')
-            })
+            .filter(|e| e.path().is_file() && !e.file_name().to_string_lossy().starts_with('.'))
             .filter_map(|e| {
                 e.metadata()
                     .ok()
@@ -129,9 +126,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let suggestions = suggest_prompts(tmp.path());
         assert!(suggestions.len() >= 2);
-        assert!(suggestions
-            .iter()
-            .any(|s| s.category == SuggestionCategory::General));
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.category == SuggestionCategory::General)
+        );
     }
 
     #[test]
@@ -139,10 +138,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         std::fs::write(tmp.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
         let suggestions = suggest_prompts(tmp.path());
-        assert!(suggestions
-            .iter()
-            .any(|s| s.text.contains("cargo test")
-                && s.category == SuggestionCategory::ProjectSpecific));
+        assert!(
+            suggestions.iter().any(|s| s.text.contains("cargo test")
+                && s.category == SuggestionCategory::ProjectSpecific)
+        );
     }
 
     #[test]
@@ -150,9 +149,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         std::fs::write(tmp.path().join("package.json"), "{}").unwrap();
         let suggestions = suggest_prompts(tmp.path());
-        assert!(suggestions
-            .iter()
-            .any(|s| s.text.contains("npm test")));
+        assert!(suggestions.iter().any(|s| s.text.contains("npm test")));
     }
 
     #[test]
@@ -160,9 +157,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         std::fs::write(tmp.path().join("requirements.txt"), "flask\n").unwrap();
         let suggestions = suggest_prompts(tmp.path());
-        assert!(suggestions
-            .iter()
-            .any(|s| s.text.contains("pytest")));
+        assert!(suggestions.iter().any(|s| s.text.contains("pytest")));
     }
 
     #[test]
@@ -170,8 +165,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         std::fs::write(tmp.path().join("main.rs"), "fn main() {}").unwrap();
         let suggestions = suggest_prompts(tmp.path());
-        assert!(suggestions
-            .iter()
-            .any(|s| s.category == SuggestionCategory::RecentlyModified));
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.category == SuggestionCategory::RecentlyModified)
+        );
     }
 }

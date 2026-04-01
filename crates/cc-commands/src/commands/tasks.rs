@@ -39,9 +39,7 @@ pub static TASKS: CommandDef = CommandDef {
                     "Cancelling task '{}'...",
                     id
                 ))),
-                _ => Ok(CommandOutput::message(
-                    "Usage: /tasks [list|cancel <id>]",
-                )),
+                _ => Ok(CommandOutput::message("Usage: /tasks [list|cancel <id>]")),
             }
         })
     },

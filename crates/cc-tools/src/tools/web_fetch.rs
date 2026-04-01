@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{
     RenderedContent, SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult,
@@ -135,9 +135,12 @@ impl Tool for WebFetchTool {
             .unwrap_or("unknown")
             .to_string();
 
-        let body = response.text().await.map_err(|e| ToolError::ExecutionFailed {
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let body = response
+            .text()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         // Truncate very large responses
         let max_chars = 100_000;

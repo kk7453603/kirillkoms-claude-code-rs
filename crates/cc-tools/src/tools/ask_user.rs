@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -97,12 +97,11 @@ impl Tool for AskUserQuestionTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let questions = input
-            .get("questions")
-            .and_then(|v| v.as_array())
-            .ok_or(ToolError::ValidationFailed {
+        let questions = input.get("questions").and_then(|v| v.as_array()).ok_or(
+            ToolError::ValidationFailed {
                 message: "Missing 'questions' parameter".into(),
-            })?;
+            },
+        )?;
 
         // In a real implementation, this would pause and wait for user input.
         // For now, return the questions that would be asked.
@@ -125,7 +124,11 @@ impl Tool for AskUserQuestionTool {
                     .get("multiSelect")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                let mode = if multi { "multi-select" } else { "single-select" };
+                let mode = if multi {
+                    "multi-select"
+                } else {
+                    "single-select"
+                };
                 output.push_str(&format!("   Options ({}): ", mode));
                 let opts: Vec<&str> = options.iter().filter_map(|o| o.as_str()).collect();
                 output.push_str(&opts.join(", "));

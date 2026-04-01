@@ -8,10 +8,7 @@ use std::path::{Path, PathBuf};
 /// Only paths that actually exist on disk are returned.
 pub fn discover_claude_md_files(project_root: &Path) -> Vec<PathBuf> {
     let candidates = crate::paths::claude_md_paths(project_root);
-    candidates
-        .into_iter()
-        .filter(|p| p.is_file())
-        .collect()
+    candidates.into_iter().filter(|p| p.is_file()).collect()
 }
 
 /// Load and concatenate all CLAUDE.md content.
@@ -57,7 +54,11 @@ mod tests {
     #[test]
     fn discover_root_claude_md() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("CLAUDE.md"), "# Project\nInstructions here.").unwrap();
+        std::fs::write(
+            dir.path().join("CLAUDE.md"),
+            "# Project\nInstructions here.",
+        )
+        .unwrap();
         let files = discover_claude_md_files(dir.path());
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("CLAUDE.md"));

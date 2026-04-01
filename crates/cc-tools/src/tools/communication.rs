@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -80,10 +80,7 @@ impl Tool for BriefTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let message = input
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let message = input.get("message").and_then(|v| v.as_str()).unwrap_or("");
         let status = input
             .get("status")
             .and_then(|v| v.as_str())
@@ -163,14 +160,8 @@ impl Tool for SendMessageTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let message = input
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let to = input
-            .get("to")
-            .and_then(|v| v.as_str())
-            .unwrap_or("user");
+        let message = input.get("message").and_then(|v| v.as_str()).unwrap_or("");
+        let to = input.get("to").and_then(|v| v.as_str()).unwrap_or("user");
 
         Ok(ToolResult::text(&format!(
             "Message sent to {}: {}",

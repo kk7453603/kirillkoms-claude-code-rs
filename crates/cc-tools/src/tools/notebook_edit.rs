@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 use crate::trait_def::{RenderedContent, Tool, ToolError, ToolResult, ValidationResult};
@@ -105,12 +105,11 @@ impl Tool for NotebookEditTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let notebook_path = input
-            .get("notebook_path")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
+        let notebook_path = input.get("notebook_path").and_then(|v| v.as_str()).ok_or(
+            ToolError::ValidationFailed {
                 message: "Missing 'notebook_path' parameter".into(),
-            })?;
+            },
+        )?;
 
         let new_source = input
             .get("new_source")
@@ -135,11 +134,12 @@ impl Tool for NotebookEditTool {
             )));
         }
 
-        let content = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed {
-                message: format!("Failed to read notebook '{}': {}", notebook_path, e),
-            })?;
+        let content =
+            tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: format!("Failed to read notebook '{}': {}", notebook_path, e),
+                })?;
 
         let mut notebook: Value =
             serde_json::from_str(&content).map_err(|e| ToolError::ExecutionFailed {
@@ -210,9 +210,7 @@ impl Tool for NotebookEditTool {
                         }
                     }
                 } else {
-                    return Ok(ToolResult::error(
-                        "cell_id is required for delete mode",
-                    ));
+                    return Ok(ToolResult::error("cell_id is required for delete mode"));
                 }
             }
             _ => {

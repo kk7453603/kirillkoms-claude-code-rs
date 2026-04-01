@@ -22,8 +22,8 @@ impl Default for RetryConfig {
 
 /// Calculate delay for a given retry attempt (0-based).
 pub fn retry_delay(config: &RetryConfig, attempt: u32) -> Duration {
-    let delay_ms = config.initial_delay.as_millis() as f64
-        * config.backoff_factor.powi(attempt as i32);
+    let delay_ms =
+        config.initial_delay.as_millis() as f64 * config.backoff_factor.powi(attempt as i32);
     let delay = Duration::from_millis(delay_ms as u64);
     if delay > config.max_delay {
         config.max_delay

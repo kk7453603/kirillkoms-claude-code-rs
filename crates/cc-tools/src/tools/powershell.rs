@@ -1,7 +1,9 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::trait_def::{InterruptBehavior, RenderedContent, Tool, ToolError, ToolResult, ValidationResult};
+use crate::trait_def::{
+    InterruptBehavior, RenderedContent, Tool, ToolError, ToolResult, ValidationResult,
+};
 
 pub struct PowerShellTool;
 
@@ -90,12 +92,13 @@ impl Tool for PowerShellTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let command = input
-            .get("command")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'command' parameter".into(),
-            })?;
+        let command =
+            input
+                .get("command")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'command' parameter".into(),
+                })?;
 
         let timeout_ms = input
             .get("timeout")
@@ -114,15 +117,13 @@ impl Tool for PowerShellTool {
             .current_dir(std::env::current_dir().unwrap_or_default())
             .output();
 
-        let output = tokio::time::timeout(
-            std::time::Duration::from_millis(timeout_ms),
-            output_future,
-        )
-        .await
-        .map_err(|_| ToolError::Timeout { timeout_ms })?
-        .map_err(|e| ToolError::ExecutionFailed {
-            message: e.to_string(),
-        })?;
+        let output =
+            tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), output_future)
+                .await
+                .map_err(|_| ToolError::Timeout { timeout_ms })?
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: e.to_string(),
+                })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);

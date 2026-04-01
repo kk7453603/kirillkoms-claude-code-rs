@@ -10,24 +10,20 @@ pub static SKILLS: CommandDef = CommandDef {
         Box::pin(async {
             let mut lines = vec!["Available Skills:".to_string(), String::new()];
             lines.push("Bundled:".to_string());
-            lines.push("  /commit          Create a git commit with AI-generated message".to_string());
+            lines.push(
+                "  /commit          Create a git commit with AI-generated message".to_string(),
+            );
             lines.push("  /review-pr       Review a pull request".to_string());
             lines.push("  /simplify        Review changed code for quality".to_string());
 
             // Check for user-defined skills
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let skills_dir = cwd.join(".claude").join("skills");
             if skills_dir.is_dir() {
                 if let Ok(entries) = std::fs::read_dir(&skills_dir) {
                     let md_files: Vec<_> = entries
                         .flatten()
-                        .filter(|e| {
-                            e.path()
-                                .extension()
-                                .and_then(|ext| ext.to_str())
-                                == Some("md")
-                        })
+                        .filter(|e| e.path().extension().and_then(|ext| ext.to_str()) == Some("md"))
                         .collect();
                     if !md_files.is_empty() {
                         lines.push(String::new());
@@ -46,9 +42,7 @@ pub static SKILLS: CommandDef = CommandDef {
             }
 
             lines.push(String::new());
-            lines.push(
-                "Add custom skills as .md files in .claude/skills/".to_string(),
-            );
+            lines.push("Add custom skills as .md files in .claude/skills/".to_string());
 
             Ok(CommandOutput::message(&lines.join("\n")))
         })

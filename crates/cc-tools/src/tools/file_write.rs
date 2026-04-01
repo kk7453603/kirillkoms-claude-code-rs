@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 use crate::trait_def::{RenderedContent, Tool, ToolError, ToolResult, ValidationResult};
@@ -93,33 +93,36 @@ impl Tool for FileWriteTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let file_path = input
-            .get("file_path")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'file_path' parameter".into(),
-            })?;
-        let content = input
-            .get("content")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'content' parameter".into(),
-            })?;
+        let file_path =
+            input
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'file_path' parameter".into(),
+                })?;
+        let content =
+            input
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'content' parameter".into(),
+                })?;
 
         let path = Path::new(file_path);
 
         // Create parent directories if needed
         if let Some(parent) = path.parent()
-            && !parent.exists() {
-                tokio::fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| ToolError::ExecutionFailed {
-                        message: format!(
-                            "Failed to create parent directories for '{}': {}",
-                            file_path, e
-                        ),
-                    })?;
-            }
+            && !parent.exists()
+        {
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: format!(
+                        "Failed to create parent directories for '{}': {}",
+                        file_path, e
+                    ),
+                })?;
+        }
 
         let is_new = !path.exists();
 

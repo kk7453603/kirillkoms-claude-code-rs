@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{
     InterruptBehavior, RenderedContent, Tool, ToolError, ToolResult, ValidationResult,
@@ -107,12 +107,13 @@ impl Tool for AgentTool {
             .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("sub-agent task");
-        let prompt = input
-            .get("prompt")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'prompt' parameter".into(),
-            })?;
+        let prompt =
+            input
+                .get("prompt")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'prompt' parameter".into(),
+                })?;
         let run_in_background = input
             .get("run_in_background")
             .and_then(|v| v.as_bool())
@@ -142,12 +143,9 @@ impl Tool for AgentTool {
                 child.id()
             )))
         } else {
-            let output = cmd
-                .output()
-                .await
-                .map_err(|e| ToolError::ExecutionFailed {
-                    message: format!("Agent failed: {}", e),
-                })?;
+            let output = cmd.output().await.map_err(|e| ToolError::ExecutionFailed {
+                message: format!("Agent failed: {}", e),
+            })?;
 
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);

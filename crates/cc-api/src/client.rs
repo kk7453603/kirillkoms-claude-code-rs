@@ -24,10 +24,7 @@ pub trait ApiClient: Send + Sync {
 
     /// Send a non-streaming messages request.
     /// Returns the complete response.
-    async fn send_messages(
-        &self,
-        request: MessagesRequest,
-    ) -> Result<MessagesResponse, ApiError>;
+    async fn send_messages(&self, request: MessagesRequest) -> Result<MessagesResponse, ApiError>;
 }
 
 /// Create an API client based on configuration.
@@ -61,21 +58,22 @@ pub fn create_client_for_provider(
             let project_id = std::env::var("CLOUD_ML_PROJECT_ID")
                 .or_else(|_| std::env::var("GOOGLE_CLOUD_PROJECT"))
                 .map_err(|_| ApiError::AuthError {
-                    message: "CLOUD_ML_PROJECT_ID or GOOGLE_CLOUD_PROJECT must be set for Vertex AI".into(),
+                    message:
+                        "CLOUD_ML_PROJECT_ID or GOOGLE_CLOUD_PROJECT must be set for Vertex AI"
+                            .into(),
                 })?;
-            let region = std::env::var("CLOUD_ML_REGION")
-                .unwrap_or_else(|_| "us-central1".to_string());
+            let region =
+                std::env::var("CLOUD_ML_REGION").unwrap_or_else(|_| "us-central1".to_string());
             let model_id = std::env::var("ANTHROPIC_MODEL")
                 .unwrap_or_else(|_| "claude-3-sonnet@20240229".to_string());
             let client = VertexApiClient::new(project_id, region, model_id)?;
             Ok(Box::new(client))
         }
         ApiProvider::Foundry => {
-            let base_url = std::env::var("AZURE_FOUNDRY_BASE_URL").map_err(|_| {
-                ApiError::AuthError {
+            let base_url =
+                std::env::var("AZURE_FOUNDRY_BASE_URL").map_err(|_| ApiError::AuthError {
                     message: "AZURE_FOUNDRY_BASE_URL must be set for Azure Foundry".into(),
-                }
-            })?;
+                })?;
             let resource = std::env::var("AZURE_FOUNDRY_RESOURCE")
                 .unwrap_or_else(|_| "claude-deployment".to_string());
             let client = FoundryApiClient::new(base_url, resource)?;

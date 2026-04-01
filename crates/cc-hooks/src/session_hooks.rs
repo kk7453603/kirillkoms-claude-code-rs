@@ -63,12 +63,8 @@ impl SessionHookManager {
         tool_input: &serde_json::Value,
         tool_output: &serde_json::Value,
     ) -> HookOutcome {
-        let input = events::post_tool_use_input(
-            tool_name,
-            tool_input,
-            tool_output,
-            Some(&self.session_id),
-        );
+        let input =
+            events::post_tool_use_input(tool_name, tool_input, tool_output, Some(&self.session_id));
         dispatch_hooks(&self.config, HookEventType::PostToolUse, &input, &self.cwd).await
     }
 
@@ -87,13 +83,7 @@ impl SessionHookManager {
     /// Run FileChanged hooks.
     pub async fn run_file_changed(&self, file_path: &str) -> HookOutcome {
         let input = events::file_changed_input(file_path, Some(&self.session_id));
-        dispatch_hooks(
-            &self.config,
-            HookEventType::FileChanged,
-            &input,
-            &self.cwd,
-        )
-        .await
+        dispatch_hooks(&self.config, HookEventType::FileChanged, &input, &self.cwd).await
     }
 }
 
@@ -104,7 +94,11 @@ mod tests {
     use std::path::PathBuf;
 
     fn empty_manager() -> SessionHookManager {
-        SessionHookManager::new(HooksConfig::new(), "test-session".to_string(), PathBuf::from("/tmp"))
+        SessionHookManager::new(
+            HooksConfig::new(),
+            "test-session".to_string(),
+            PathBuf::from("/tmp"),
+        )
     }
 
     #[test]
@@ -234,7 +228,10 @@ mod tests {
             )
             .await;
         match outcome {
-            HookOutcome::Approved { message, updated_input } => {
+            HookOutcome::Approved {
+                message,
+                updated_input,
+            } => {
                 assert!(message.is_none());
                 assert!(updated_input.is_none());
             }
@@ -273,14 +270,9 @@ mod tests {
                 timeout_ms: 5000,
             },
         );
-        let mgr = SessionHookManager::new(
-            config,
-            "my-session-42".to_string(),
-            PathBuf::from("/tmp"),
-        );
-        let outcome = mgr
-            .run_pre_tool_use("Bash", &serde_json::json!({}))
-            .await;
+        let mgr =
+            SessionHookManager::new(config, "my-session-42".to_string(), PathBuf::from("/tmp"));
+        let outcome = mgr.run_pre_tool_use("Bash", &serde_json::json!({})).await;
         match outcome {
             HookOutcome::Approved { message, .. } => {
                 assert_eq!(message.as_deref(), Some("sid-my-session-42"));

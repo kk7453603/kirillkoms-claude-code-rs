@@ -16,12 +16,19 @@ pub static PR_COMMENTS: CommandDef = CommandDef {
                 ));
             }
 
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             let result = cc_utils::shell::execute_command(
                 "gh",
-                &["pr", "view", &args, "--json", "comments,reviews", "--jq", ".comments | length"],
+                &[
+                    "pr",
+                    "view",
+                    &args,
+                    "--json",
+                    "comments,reviews",
+                    "--jq",
+                    ".comments | length",
+                ],
                 &cwd,
             )
             .await;

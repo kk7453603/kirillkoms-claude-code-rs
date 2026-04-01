@@ -185,18 +185,19 @@ impl ApiClient for FoundryApiClient {
         })?;
 
         let status = response.status().as_u16();
-        let body_text = response.text().await.map_err(|e| ApiError::ConnectionError {
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let body_text = response
+            .text()
+            .await
+            .map_err(|e| ApiError::ConnectionError {
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         if status != 200 {
             return Err(ApiError::from_status(status, &body_text));
         }
 
-        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| {
-            ApiError::InvalidRequest {
-                message: format!("Failed to parse response: {}", e),
-            }
+        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| ApiError::InvalidRequest {
+            message: format!("Failed to parse response: {}", e),
         })
     }
 }
@@ -269,11 +270,9 @@ mod tests {
 
     #[tokio::test]
     async fn send_messages_connection_error() {
-        let client = FoundryApiClient::new(
-            "http://localhost:1".to_string(),
-            "deployment".to_string(),
-        )
-        .unwrap();
+        let client =
+            FoundryApiClient::new("http://localhost:1".to_string(), "deployment".to_string())
+                .unwrap();
         let request = MessagesRequest {
             model: "claude-sonnet-4-20250514".to_string(),
             messages: vec![],

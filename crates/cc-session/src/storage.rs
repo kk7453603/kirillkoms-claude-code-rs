@@ -17,9 +17,10 @@ pub fn list_sessions(sessions_root: &Path) -> Result<Vec<String>, std::io::Error
     for entry in entries {
         let entry = entry?;
         if entry.file_type()?.is_dir()
-            && let Some(name) = entry.file_name().to_str() {
-                sessions.push(name.to_string());
-            }
+            && let Some(name) = entry.file_name().to_str()
+        {
+            sessions.push(name.to_string());
+        }
     }
     sessions.sort();
     Ok(sessions)
@@ -53,7 +54,10 @@ mod tests {
     fn test_transcript_path() {
         let root = Path::new("/tmp/sessions");
         let path = transcript_path(root, "abc-123");
-        assert_eq!(path, PathBuf::from("/tmp/sessions/abc-123/transcript.jsonl"));
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp/sessions/abc-123/transcript.jsonl")
+        );
     }
 
     #[test]
@@ -80,11 +84,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let sid = "to-delete";
         std::fs::create_dir(dir.path().join(sid)).unwrap();
-        std::fs::write(
-            dir.path().join(sid).join("transcript.jsonl"),
-            "{}",
-        )
-        .unwrap();
+        std::fs::write(dir.path().join(sid).join("transcript.jsonl"), "{}").unwrap();
 
         delete_session(dir.path(), sid).unwrap();
         assert!(!dir.path().join(sid).exists());

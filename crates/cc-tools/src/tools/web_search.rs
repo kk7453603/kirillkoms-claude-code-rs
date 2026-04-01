@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{
     RenderedContent, SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult,
@@ -64,7 +64,12 @@ impl WebSearchTool {
         let mut output = format!("Found {} result(s):\n", count);
 
         for (i, result) in results.iter().take(MAX_RESULTS).enumerate() {
-            output.push_str(&format!("\n{}. {}\n   URL: {}\n", i + 1, result.title, result.url));
+            output.push_str(&format!(
+                "\n{}. {}\n   URL: {}\n",
+                i + 1,
+                result.title,
+                result.url
+            ));
             if !result.content.is_empty() {
                 output.push_str(&format!("   {}\n", result.content));
             }
@@ -157,12 +162,11 @@ impl Tool for WebSearchTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let query = input
-            .get("query")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::ValidationFailed {
+        let query = input.get("query").and_then(|v| v.as_str()).ok_or_else(|| {
+            ToolError::ValidationFailed {
                 message: "Missing 'query' parameter".to_string(),
-            })?;
+            }
+        })?;
 
         let full_query = Self::build_query(query, &input);
         let base_url = Self::base_url();
@@ -186,12 +190,13 @@ impl Tool for WebSearchTool {
             )));
         }
 
-        let searxng_response: SearxngResponse = response
-            .json()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed {
-                message: format!("Failed to parse response: {e}"),
-            })?;
+        let searxng_response: SearxngResponse =
+            response
+                .json()
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: format!("Failed to parse response: {e}"),
+                })?;
 
         let text = Self::format_results(&searxng_response.results);
         Ok(ToolResult::text(&text))
@@ -306,7 +311,11 @@ mod tests {
         assert!(text.contains("URL: https://example.com"));
         // Empty content line should not appear
         let lines: Vec<&str> = text.lines().collect();
-        assert!(!lines.iter().any(|l| l.trim().is_empty() && l.starts_with("   ")));
+        assert!(
+            !lines
+                .iter()
+                .any(|l| l.trim().is_empty() && l.starts_with("   "))
+        );
     }
 
     #[test]

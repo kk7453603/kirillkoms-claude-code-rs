@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{
     RenderedContent, SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult,
@@ -80,12 +80,13 @@ impl Tool for GlobTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let pattern = input
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'pattern' parameter".into(),
-            })?;
+        let pattern =
+            input
+                .get("pattern")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'pattern' parameter".into(),
+                })?;
 
         let base_path = input
             .get("path")
@@ -132,10 +133,7 @@ impl Tool for GlobTool {
 
         let mut output = result.join("\n");
         if entries.len() > 1000 {
-            output.push_str(&format!(
-                "\n\n... and {} more files",
-                entries.len() - 1000
-            ));
+            output.push_str(&format!("\n\n... and {} more files", entries.len() - 1000));
         }
 
         Ok(ToolResult::text(&output))

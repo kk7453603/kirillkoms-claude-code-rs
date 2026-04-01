@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -121,10 +121,7 @@ mod tests {
     #[tokio::test]
     async fn test_call_get() {
         let tool = ConfigTool::new();
-        let result = tool
-            .call(json!({"setting": "model"}))
-            .await
-            .unwrap();
+        let result = tool.call(json!({"setting": "model"})).await.unwrap();
         assert!(result.is_error);
         assert!(result.content.as_str().unwrap().contains("model"));
     }

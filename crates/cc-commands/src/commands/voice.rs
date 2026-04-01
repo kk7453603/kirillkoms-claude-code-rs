@@ -14,9 +14,7 @@ pub static VOICE: CommandDef = CommandDef {
                     "Voice mode is not yet supported in this version.\n\
                      This feature requires a microphone and speech-to-text service.",
                 )),
-                "off" | "false" | "0" => Ok(CommandOutput::message(
-                    "Voice mode disabled.",
-                )),
+                "off" | "false" | "0" => Ok(CommandOutput::message("Voice mode disabled.")),
                 "" => Ok(CommandOutput::message(
                     "Voice mode: off (not available)\n\n\
                      Voice input is not yet supported in this version.\n\

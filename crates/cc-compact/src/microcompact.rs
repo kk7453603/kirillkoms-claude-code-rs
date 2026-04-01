@@ -28,23 +28,14 @@ mod tests {
 
     #[test]
     fn test_no_tool_results() {
-        let result = identify_compactable_results(
-            3,
-            &[false, false, false],
-            &[1000, 2000, 3000],
-            500,
-        );
+        let result =
+            identify_compactable_results(3, &[false, false, false], &[1000, 2000, 3000], 500);
         assert!(result.is_empty());
     }
 
     #[test]
     fn test_tool_results_below_min_size() {
-        let result = identify_compactable_results(
-            3,
-            &[true, true, true],
-            &[100, 200, 300],
-            500,
-        );
+        let result = identify_compactable_results(3, &[true, true, true], &[100, 200, 300], 500);
         assert!(result.is_empty());
     }
 
@@ -61,12 +52,7 @@ mod tests {
 
     #[test]
     fn test_all_compactable() {
-        let result = identify_compactable_results(
-            3,
-            &[true, true, true],
-            &[1000, 2000, 3000],
-            500,
-        );
+        let result = identify_compactable_results(3, &[true, true, true], &[1000, 2000, 3000], 500);
         assert_eq!(result, vec![0, 1, 2]);
     }
 
@@ -79,23 +65,13 @@ mod tests {
     #[test]
     fn test_mismatched_lengths() {
         // message_count larger than slices - should use the min of all lengths
-        let result = identify_compactable_results(
-            10,
-            &[true, true],
-            &[1000, 500],
-            500,
-        );
+        let result = identify_compactable_results(10, &[true, true], &[1000, 500], 500);
         assert_eq!(result, vec![0, 1]);
     }
 
     #[test]
     fn test_exact_min_size() {
-        let result = identify_compactable_results(
-            1,
-            &[true],
-            &[500],
-            500,
-        );
+        let result = identify_compactable_results(1, &[true], &[500], 500);
         assert_eq!(result, vec![0]);
     }
 }

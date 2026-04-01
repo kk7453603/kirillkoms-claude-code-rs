@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 use crate::trait_def::{RenderedContent, Tool, ToolError, ToolResult, ValidationResult};
@@ -119,24 +119,23 @@ impl Tool for FileEditTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let file_path = input
-            .get("file_path")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'file_path' parameter".into(),
-            })?;
-        let old_string = input
-            .get("old_string")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
+        let file_path =
+            input
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'file_path' parameter".into(),
+                })?;
+        let old_string = input.get("old_string").and_then(|v| v.as_str()).ok_or(
+            ToolError::ValidationFailed {
                 message: "Missing 'old_string' parameter".into(),
-            })?;
-        let new_string = input
-            .get("new_string")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
+            },
+        )?;
+        let new_string = input.get("new_string").and_then(|v| v.as_str()).ok_or(
+            ToolError::ValidationFailed {
                 message: "Missing 'new_string' parameter".into(),
-            })?;
+            },
+        )?;
         let replace_all = input
             .get("replace_all")
             .and_then(|v| v.as_bool())
@@ -144,17 +143,15 @@ impl Tool for FileEditTool {
 
         let path = Path::new(file_path);
         if !path.exists() {
-            return Ok(ToolResult::error(&format!(
-                "File not found: {}",
-                file_path
-            )));
+            return Ok(ToolResult::error(&format!("File not found: {}", file_path)));
         }
 
-        let content = tokio::fs::read_to_string(path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed {
-                message: format!("Failed to read file '{}': {}", file_path, e),
-            })?;
+        let content =
+            tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    message: format!("Failed to read file '{}': {}", file_path, e),
+                })?;
 
         if !content.contains(old_string) {
             return Ok(ToolResult::error(

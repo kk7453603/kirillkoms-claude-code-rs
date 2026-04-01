@@ -1,24 +1,24 @@
-pub mod help;
 pub mod clear;
+pub mod commit;
 pub mod compact;
 pub mod config;
+pub mod context;
 pub mod cost;
 pub mod diff;
 pub mod doctor;
 pub mod exit;
-pub mod model;
-pub mod status;
-pub mod version;
-pub mod memory;
-pub mod resume;
-pub mod session;
-pub mod theme;
-pub mod permissions;
-pub mod context;
-pub mod commit;
-pub mod review;
+pub mod help;
 pub mod hooks;
 pub mod mcp;
+pub mod memory;
+pub mod model;
+pub mod permissions;
+pub mod resume;
+pub mod review;
+pub mod session;
+pub mod status;
+pub mod theme;
+pub mod version;
 
 // Batch 2 commands
 pub mod add_dir;

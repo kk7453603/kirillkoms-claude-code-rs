@@ -1,9 +1,9 @@
 pub mod app;
-pub mod message_list;
-pub mod permission_dialog;
 pub mod diff_view;
 pub mod input;
-pub mod themes;
 pub mod keybindings;
+pub mod message_list;
+pub mod permission_dialog;
 pub mod progress;
 pub mod render;
+pub mod themes;

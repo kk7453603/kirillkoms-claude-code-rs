@@ -1,14 +1,13 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::{LazyLock, Mutex};
 
 use cc_tasks::types::{TaskInfo, TaskManager, TaskStatus};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
-static TASK_MANAGER: LazyLock<Mutex<TaskManager>> = LazyLock::new(|| {
-    Mutex::new(TaskManager::new())
-});
+static TASK_MANAGER: LazyLock<Mutex<TaskManager>> =
+    LazyLock::new(|| Mutex::new(TaskManager::new()));
 
 fn parse_status(s: &str) -> Option<TaskStatus> {
     match s {
@@ -80,20 +79,33 @@ impl Tool for TaskCreateTool {
         "Create a new background task that can run independently.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { false }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        false
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, input: &Value) -> ValidationResult {
         match input.get("prompt").and_then(|v| v.as_str()) {
             Some(p) if !p.is_empty() => ValidationResult::Ok,
-            _ => ValidationResult::Error { message: "Missing or empty 'prompt' parameter".into() },
+            _ => ValidationResult::Error {
+                message: "Missing or empty 'prompt' parameter".into(),
+            },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let prompt = input.get("prompt").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'prompt' parameter".into() })?;
+        let prompt =
+            input
+                .get("prompt")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'prompt' parameter".into(),
+                })?;
         let description = input.get("description").and_then(|v| v.as_str());
 
         let task_id = uuid::Uuid::new_v4().to_string();
@@ -123,16 +135,22 @@ impl Tool for TaskCreateTool {
 pub struct TaskGetTool;
 
 impl TaskGetTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for TaskGetTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for TaskGetTool {
-    fn name(&self) -> &str { "TaskGet" }
+    fn name(&self) -> &str {
+        "TaskGet"
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -151,20 +169,33 @@ impl Tool for TaskGetTool {
         "Get the status and details of a task by its ID.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { true }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        true
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, input: &Value) -> ValidationResult {
         match input.get("task_id").and_then(|v| v.as_str()) {
             Some(id) if !id.is_empty() => ValidationResult::Ok,
-            _ => ValidationResult::Error { message: "Missing or empty 'task_id' parameter".into() },
+            _ => ValidationResult::Error {
+                message: "Missing or empty 'task_id' parameter".into(),
+            },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let task_id = input.get("task_id").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let task_id =
+            input
+                .get("task_id")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'task_id' parameter".into(),
+                })?;
 
         let mgr = TASK_MANAGER.lock().unwrap();
         match mgr.get_task(task_id) {
@@ -183,16 +214,22 @@ impl Tool for TaskGetTool {
 pub struct TaskUpdateTool;
 
 impl TaskUpdateTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for TaskUpdateTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for TaskUpdateTool {
-    fn name(&self) -> &str { "TaskUpdate" }
+    fn name(&self) -> &str {
+        "TaskUpdate"
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -220,20 +257,33 @@ impl Tool for TaskUpdateTool {
         "Update the status or result of an existing task.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { false }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        false
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, input: &Value) -> ValidationResult {
         match input.get("task_id").and_then(|v| v.as_str()) {
             Some(id) if !id.is_empty() => ValidationResult::Ok,
-            _ => ValidationResult::Error { message: "Missing or empty 'task_id' parameter".into() },
+            _ => ValidationResult::Error {
+                message: "Missing or empty 'task_id' parameter".into(),
+            },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let task_id = input.get("task_id").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let task_id =
+            input
+                .get("task_id")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'task_id' parameter".into(),
+                })?;
         let status_str = input.get("status").and_then(|v| v.as_str());
         let result_str = input.get("result").and_then(|v| v.as_str());
 
@@ -253,7 +303,10 @@ impl Tool for TaskUpdateTool {
                     updated.push(format!("status -> {}", status_s));
                 }
                 None => {
-                    return Ok(ToolResult::error(&format!("Invalid status: '{}'", status_s)));
+                    return Ok(ToolResult::error(&format!(
+                        "Invalid status: '{}'",
+                        status_s
+                    )));
                 }
             }
         }
@@ -264,9 +317,16 @@ impl Tool for TaskUpdateTool {
         }
 
         if updated.is_empty() {
-            Ok(ToolResult::text(&format!("Task '{}': no changes applied (provide 'status' or 'result')", task_id)))
+            Ok(ToolResult::text(&format!(
+                "Task '{}': no changes applied (provide 'status' or 'result')",
+                task_id
+            )))
         } else {
-            Ok(ToolResult::text(&format!("Task '{}' updated: {}", task_id, updated.join(", "))))
+            Ok(ToolResult::text(&format!(
+                "Task '{}' updated: {}",
+                task_id,
+                updated.join(", ")
+            )))
         }
     }
 }
@@ -276,16 +336,22 @@ impl Tool for TaskUpdateTool {
 pub struct TaskStopTool;
 
 impl TaskStopTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for TaskStopTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for TaskStopTool {
-    fn name(&self) -> &str { "TaskStop" }
+    fn name(&self) -> &str {
+        "TaskStop"
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -304,37 +370,49 @@ impl Tool for TaskStopTool {
         "Stop a running task.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { false }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        false
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, input: &Value) -> ValidationResult {
         match input.get("task_id").and_then(|v| v.as_str()) {
             Some(id) if !id.is_empty() => ValidationResult::Ok,
-            _ => ValidationResult::Error { message: "Missing or empty 'task_id' parameter".into() },
+            _ => ValidationResult::Error {
+                message: "Missing or empty 'task_id' parameter".into(),
+            },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let task_id = input.get("task_id").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let task_id =
+            input
+                .get("task_id")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'task_id' parameter".into(),
+                })?;
 
         let mut mgr = TASK_MANAGER.lock().unwrap();
         match mgr.get_task(task_id) {
-            Some(task) => {
-                match task.status {
-                    TaskStatus::Running | TaskStatus::Pending => {
-                        mgr.update_status(task_id, TaskStatus::Cancelled);
-                        Ok(ToolResult::text(&format!("Task '{}' has been cancelled", task_id)))
-                    }
-                    other => {
-                        Ok(ToolResult::error(&format!(
-                            "Task '{}' cannot be stopped (current status: {:?})",
-                            task_id, other
-                        )))
-                    }
+            Some(task) => match task.status {
+                TaskStatus::Running | TaskStatus::Pending => {
+                    mgr.update_status(task_id, TaskStatus::Cancelled);
+                    Ok(ToolResult::text(&format!(
+                        "Task '{}' has been cancelled",
+                        task_id
+                    )))
                 }
-            }
+                other => Ok(ToolResult::error(&format!(
+                    "Task '{}' cannot be stopped (current status: {:?})",
+                    task_id, other
+                ))),
+            },
             None => Ok(ToolResult::error(&format!("Task '{}' not found", task_id))),
         }
     }
@@ -345,16 +423,22 @@ impl Tool for TaskStopTool {
 pub struct TaskListTool;
 
 impl TaskListTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for TaskListTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for TaskListTool {
-    fn name(&self) -> &str { "TaskList" }
+    fn name(&self) -> &str {
+        "TaskList"
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -374,9 +458,15 @@ impl Tool for TaskListTool {
         "List all tasks, optionally filtered by status.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { true }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        true
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, _input: &Value) -> ValidationResult {
         ValidationResult::Ok
@@ -390,12 +480,16 @@ impl Tool for TaskListTool {
 
         let tasks: Vec<Value> = if let Some(filter_str) = status_filter {
             match parse_status(filter_str) {
-                Some(status) => all_tasks.iter()
+                Some(status) => all_tasks
+                    .iter()
                     .filter(|t| t.status == status)
                     .map(task_to_json)
                     .collect(),
                 None => {
-                    return Ok(ToolResult::error(&format!("Invalid status filter: '{}'", filter_str)));
+                    return Ok(ToolResult::error(&format!(
+                        "Invalid status filter: '{}'",
+                        filter_str
+                    )));
                 }
             }
         } else {
@@ -418,16 +512,22 @@ impl Tool for TaskListTool {
 pub struct TaskOutputTool;
 
 impl TaskOutputTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for TaskOutputTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for TaskOutputTool {
-    fn name(&self) -> &str { "TaskOutput" }
+    fn name(&self) -> &str {
+        "TaskOutput"
+    }
 
     fn input_schema(&self) -> Value {
         json!({
@@ -450,45 +550,56 @@ impl Tool for TaskOutputTool {
         "Get the output/logs of a task.".to_string()
     }
 
-    fn is_read_only(&self, _input: &Value) -> bool { true }
-    fn is_concurrency_safe(&self, _input: &Value) -> bool { true }
-    fn should_defer(&self) -> bool { true }
+    fn is_read_only(&self, _input: &Value) -> bool {
+        true
+    }
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        true
+    }
+    fn should_defer(&self) -> bool {
+        true
+    }
 
     fn validate_input(&self, input: &Value) -> ValidationResult {
         match input.get("task_id").and_then(|v| v.as_str()) {
             Some(id) if !id.is_empty() => ValidationResult::Ok,
-            _ => ValidationResult::Error { message: "Missing or empty 'task_id' parameter".into() },
+            _ => ValidationResult::Error {
+                message: "Missing or empty 'task_id' parameter".into(),
+            },
         }
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let task_id = input.get("task_id").and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed { message: "Missing 'task_id' parameter".into() })?;
+        let task_id =
+            input
+                .get("task_id")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'task_id' parameter".into(),
+                })?;
         let tail = input.get("tail").and_then(|v| v.as_u64());
 
         let mgr = TASK_MANAGER.lock().unwrap();
         match mgr.get_task(task_id) {
-            Some(task) => {
-                match &task.output {
-                    Some(output) => {
-                        let text = if let Some(n) = tail {
-                            let lines: Vec<&str> = output.lines().collect();
-                            let start = lines.len().saturating_sub(n as usize);
-                            lines[start..].join("\n")
-                        } else {
-                            output.clone()
-                        };
-                        Ok(ToolResult::text(&format!(
-                            "Task '{}' (status: {:?}):\n{}",
-                            task_id, task.status, text
-                        )))
-                    }
-                    None => Ok(ToolResult::text(&format!(
-                        "Task '{}' (status: {:?}): no output yet",
-                        task_id, task.status
-                    ))),
+            Some(task) => match &task.output {
+                Some(output) => {
+                    let text = if let Some(n) = tail {
+                        let lines: Vec<&str> = output.lines().collect();
+                        let start = lines.len().saturating_sub(n as usize);
+                        lines[start..].join("\n")
+                    } else {
+                        output.clone()
+                    };
+                    Ok(ToolResult::text(&format!(
+                        "Task '{}' (status: {:?}):\n{}",
+                        task_id, task.status, text
+                    )))
                 }
-            }
+                None => Ok(ToolResult::text(&format!(
+                    "Task '{}' (status: {:?}): no output yet",
+                    task_id, task.status
+                ))),
+            },
             None => Ok(ToolResult::error(&format!("Task '{}' not found", task_id))),
         }
     }
@@ -525,13 +636,22 @@ mod tests {
     #[tokio::test]
     async fn test_task_create_and_get() {
         let create = TaskCreateTool::new();
-        let result = create.call(json!({"prompt": "test task", "description": "My task"})).await.unwrap();
+        let result = create
+            .call(json!({"prompt": "test task", "description": "My task"}))
+            .await
+            .unwrap();
         assert!(!result.is_error);
         let text = result.content.as_str().unwrap();
         assert!(text.contains("Task created with ID:"));
 
         // Extract task ID from result
-        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+        let task_id = text
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split('\n')
+            .next()
+            .unwrap();
 
         // Get the task
         let get = TaskGetTool::new();
@@ -546,15 +666,33 @@ mod tests {
         let create = TaskCreateTool::new();
         let result = create.call(json!({"prompt": "update test"})).await.unwrap();
         let text = result.content.as_str().unwrap();
-        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+        let task_id = text
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split('\n')
+            .next()
+            .unwrap();
 
         let update = TaskUpdateTool::new();
-        let result = update.call(json!({"task_id": task_id, "status": "running"})).await.unwrap();
+        let result = update
+            .call(json!({"task_id": task_id, "status": "running"}))
+            .await
+            .unwrap();
         assert!(!result.is_error);
-        assert!(result.content.as_str().unwrap().contains("status -> running"));
+        assert!(
+            result
+                .content
+                .as_str()
+                .unwrap()
+                .contains("status -> running")
+        );
 
         // Update with result
-        let result = update.call(json!({"task_id": task_id, "result": "done!"})).await.unwrap();
+        let result = update
+            .call(json!({"task_id": task_id, "result": "done!"}))
+            .await
+            .unwrap();
         assert!(!result.is_error);
         assert!(result.content.as_str().unwrap().contains("output updated"));
     }
@@ -564,7 +702,13 @@ mod tests {
         let create = TaskCreateTool::new();
         let result = create.call(json!({"prompt": "stop test"})).await.unwrap();
         let text = result.content.as_str().unwrap();
-        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+        let task_id = text
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split('\n')
+            .next()
+            .unwrap();
 
         let stop = TaskStopTool::new();
         let result = stop.call(json!({"task_id": task_id})).await.unwrap();
@@ -585,7 +729,13 @@ mod tests {
         let create = TaskCreateTool::new();
         let result = create.call(json!({"prompt": "output test"})).await.unwrap();
         let text = result.content.as_str().unwrap();
-        let task_id = text.split("ID: ").nth(1).unwrap().split('\n').next().unwrap();
+        let task_id = text
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split('\n')
+            .next()
+            .unwrap();
 
         let output = TaskOutputTool::new();
         let result = output.call(json!({"task_id": task_id})).await.unwrap();
@@ -594,10 +744,16 @@ mod tests {
 
         // Add output
         let update = TaskUpdateTool::new();
-        update.call(json!({"task_id": task_id, "result": "line1\nline2\nline3"})).await.unwrap();
+        update
+            .call(json!({"task_id": task_id, "result": "line1\nline2\nline3"}))
+            .await
+            .unwrap();
 
         // Get output with tail
-        let result = output.call(json!({"task_id": task_id, "tail": 2})).await.unwrap();
+        let result = output
+            .call(json!({"task_id": task_id, "tail": 2}))
+            .await
+            .unwrap();
         assert!(!result.is_error);
         let text = result.content.as_str().unwrap();
         assert!(text.contains("line2"));
@@ -607,7 +763,10 @@ mod tests {
     #[tokio::test]
     async fn test_task_get_not_found() {
         let get = TaskGetTool::new();
-        let result = get.call(json!({"task_id": "nonexistent-id"})).await.unwrap();
+        let result = get
+            .call(json!({"task_id": "nonexistent-id"}))
+            .await
+            .unwrap();
         assert!(result.is_error);
         assert!(result.content.as_str().unwrap().contains("not found"));
     }

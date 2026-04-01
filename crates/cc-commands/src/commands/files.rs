@@ -9,15 +9,25 @@ pub static FILES: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let count: usize = args.parse().unwrap_or(20);
 
             if !cc_utils::git::is_git_repo(&cwd).await {
                 // Fall back to filesystem listing
                 let result = cc_utils::shell::execute_command(
                     "find",
-                    &[".", "-maxdepth", "3", "-type", "f", "-newer", ".", "-not", "-path", "./.git/*"],
+                    &[
+                        ".",
+                        "-maxdepth",
+                        "3",
+                        "-type",
+                        "f",
+                        "-newer",
+                        ".",
+                        "-not",
+                        "-path",
+                        "./.git/*",
+                    ],
                     &cwd,
                 )
                 .await;
@@ -57,7 +67,9 @@ pub static FILES: CommandDef = CommandDef {
                                     .take(count)
                                     .collect();
                                 if files.is_empty() {
-                                    return Ok(CommandOutput::message("No recently modified files."));
+                                    return Ok(CommandOutput::message(
+                                        "No recently modified files.",
+                                    ));
                                 }
                                 let mut lines = vec!["Recently committed files:".to_string()];
                                 for f in &files {

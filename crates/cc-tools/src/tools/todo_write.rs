@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -96,12 +96,13 @@ impl Tool for TodoWriteTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let todos = input
-            .get("todos")
-            .and_then(|v| v.as_array())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'todos' parameter".into(),
-            })?;
+        let todos =
+            input
+                .get("todos")
+                .and_then(|v| v.as_array())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'todos' parameter".into(),
+                })?;
 
         let total = todos.len();
         let completed = todos

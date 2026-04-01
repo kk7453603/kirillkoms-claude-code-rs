@@ -21,8 +21,7 @@ pub static ADD_DIR: CommandDef = CommandDef {
             let resolved = if path.is_absolute() {
                 path
             } else {
-                let cwd = std::env::current_dir()
-                    .unwrap_or_else(|_| std::path::PathBuf::from("."));
+                let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 cwd.join(&path)
             };
 

@@ -26,8 +26,7 @@ pub async fn compact_messages(
             content: vec![ContentBlock::Text { text: prompt }],
         }],
         system: vec![SystemBlock::Text {
-            text: "You are a conversation summarizer. Summarize the key points concisely."
-                .into(),
+            text: "You are a conversation summarizer. Summarize the key points concisely.".into(),
             cache_control: None,
         }],
         max_tokens: Some(2048),

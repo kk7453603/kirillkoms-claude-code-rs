@@ -9,8 +9,7 @@ pub static BRANCH: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             if !cc_utils::git::is_git_repo(&cwd).await {
                 return Ok(CommandOutput::message("Not in a git repository."));
@@ -45,28 +44,19 @@ pub static BRANCH: CommandDef = CommandDef {
             }
 
             // Check if branch exists
-            let check = cc_utils::shell::execute_command(
-                "git",
-                &["rev-parse", "--verify", &args],
-                &cwd,
-            )
-            .await;
+            let check =
+                cc_utils::shell::execute_command("git", &["rev-parse", "--verify", &args], &cwd)
+                    .await;
 
             if check.is_ok() && check.as_ref().unwrap().exit_code == 0 {
                 // Switch to existing branch
-                let result = cc_utils::shell::execute_command(
-                    "git",
-                    &["checkout", &args],
-                    &cwd,
-                )
-                .await;
+                let result =
+                    cc_utils::shell::execute_command("git", &["checkout", &args], &cwd).await;
                 match result {
-                    Ok(out) if out.exit_code == 0 => {
-                        Ok(CommandOutput::message(&format!(
-                            "Switched to branch '{}'",
-                            args
-                        )))
-                    }
+                    Ok(out) if out.exit_code == 0 => Ok(CommandOutput::message(&format!(
+                        "Switched to branch '{}'",
+                        args
+                    ))),
                     Ok(out) => Ok(CommandOutput::message(&format!(
                         "Failed to switch branch: {}",
                         out.stderr.trim()
@@ -78,19 +68,13 @@ pub static BRANCH: CommandDef = CommandDef {
                 }
             } else {
                 // Create new branch
-                let result = cc_utils::shell::execute_command(
-                    "git",
-                    &["checkout", "-b", &args],
-                    &cwd,
-                )
-                .await;
+                let result =
+                    cc_utils::shell::execute_command("git", &["checkout", "-b", &args], &cwd).await;
                 match result {
-                    Ok(out) if out.exit_code == 0 => {
-                        Ok(CommandOutput::message(&format!(
-                            "Created and switched to new branch '{}'",
-                            args
-                        )))
-                    }
+                    Ok(out) if out.exit_code == 0 => Ok(CommandOutput::message(&format!(
+                        "Created and switched to new branch '{}'",
+                        args
+                    ))),
                     Ok(out) => Ok(CommandOutput::message(&format!(
                         "Failed to create branch: {}",
                         out.stderr.trim()

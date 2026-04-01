@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio_stream::{Stream, StreamExt};
 
 use cc_api::types::{ApiMessage, ContentBlock, Role};
-use cc_session::persistence::{append_entry, TranscriptEntry};
+use cc_session::persistence::{TranscriptEntry, append_entry};
 use cc_session::storage::transcript_path;
 use cc_tools::registry::ToolRegistry;
 
@@ -87,10 +87,7 @@ impl QueryEngine {
         });
 
         // Persist user message
-        self.persist_entry(
-            "user_message",
-            serde_json::json!({ "text": user_message }),
-        );
+        self.persist_entry("user_message", serde_json::json!({ "text": user_message }));
 
         let system = self.system_context.to_system_blocks();
 
@@ -121,10 +118,7 @@ impl QueryEngine {
                     got_response = true;
                 }
                 QueryEvent::ToolUseStart { ref id, ref name } => {
-                    self.persist_entry(
-                        "tool_use",
-                        serde_json::json!({ "id": id, "name": name }),
-                    );
+                    self.persist_entry("tool_use", serde_json::json!({ "id": id, "name": name }));
                 }
                 QueryEvent::ToolResult {
                     ref id,
@@ -154,9 +148,9 @@ impl QueryEngine {
         }
 
         if let Some(err) = last_error {
-            return Err(EngineError::Api(cc_api::errors::ApiError::ConnectionError {
-                message: err,
-            }));
+            return Err(EngineError::Api(
+                cc_api::errors::ApiError::ConnectionError { message: err },
+            ));
         }
 
         if !got_response {
@@ -197,10 +191,7 @@ impl QueryEngine {
         });
 
         // Persist user message
-        self.persist_entry(
-            "user_message",
-            serde_json::json!({ "text": user_message }),
-        );
+        self.persist_entry("user_message", serde_json::json!({ "text": user_message }));
 
         let system = self.system_context.to_system_blocks();
 
@@ -336,9 +327,7 @@ mod tests {
                 ContentBlock::Text { text } => {
                     events.push(StreamEvent::ContentBlockDelta {
                         index: i,
-                        delta: cc_api::types::ContentDelta::TextDelta {
-                            text: text.clone(),
-                        },
+                        delta: cc_api::types::ContentDelta::TextDelta { text: text.clone() },
                     });
                 }
                 _ => {}
@@ -365,9 +354,7 @@ mod tests {
 
     impl MockApiClient {
         fn new(
-            responses: Vec<
-                Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>,
-            >,
+            responses: Vec<Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>>,
         ) -> Self {
             let mut responses = responses;
             responses.reverse();
@@ -418,11 +405,11 @@ mod tests {
             _request: cc_api::types::MessagesRequest,
         ) -> Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError> {
             let mut responses = self.responses.lock().unwrap();
-            responses.pop().unwrap_or(Err(
-                cc_api::errors::ApiError::InvalidRequest {
+            responses
+                .pop()
+                .unwrap_or(Err(cc_api::errors::ApiError::InvalidRequest {
                     message: "no more mock responses".to_string(),
-                },
-            ))
+                }))
         }
     }
 
@@ -572,9 +559,7 @@ mod tests {
         let client = Arc::new(MockApiClient::new(vec![]));
         let mut engine = QueryEngine::new(client, "test".to_string());
 
-        engine.set_permission_callback(Arc::new(
-            crate::tool_execution::AutoApproveCallback,
-        ));
+        engine.set_permission_callback(Arc::new(crate::tool_execution::AutoApproveCallback));
         assert!(engine.permission_callback.is_some());
     }
 
@@ -600,9 +585,7 @@ mod tests {
         let sessions_dir = dir.path().to_path_buf();
         let session_id = "persist-test";
 
-        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response(
-            "Hello!",
-        ))]));
+        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response("Hello!"))]));
         let mut engine = QueryEngine::new(client, "test".to_string());
         engine.enable_persistence(sessions_dir.clone(), session_id.to_string());
 
@@ -625,9 +608,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_submit_with_execution_context() {
-        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response(
-            "response",
-        ))]));
+        let client = Arc::new(MockApiClient::new(vec![Ok(make_text_response("response"))]));
         let mut engine = QueryEngine::new(client, "test".to_string());
 
         // Set up execution context with bypass permissions
@@ -639,9 +620,7 @@ mod tests {
             std::path::PathBuf::from("/tmp"),
         );
         engine.set_execution_context(exec_ctx);
-        engine.set_permission_callback(Arc::new(
-            crate::tool_execution::AutoApproveCallback,
-        ));
+        engine.set_permission_callback(Arc::new(crate::tool_execution::AutoApproveCallback));
 
         let result = engine.submit("test").await;
         assert!(result.is_ok());

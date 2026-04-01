@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::{
-    ContentBlock, ContentDelta, MessagesResponse, Role, StreamEvent, Usage,
-};
+use crate::types::{ContentBlock, ContentDelta, MessagesResponse, Role, StreamEvent, Usage};
 
 /// A parsed SSE event.
 #[derive(Debug, Clone, PartialEq)]
@@ -42,10 +40,12 @@ pub fn parse_sse_line(line: &str) -> Option<SseEvent> {
             event_type: Some(event_type.to_string()),
             data: String::new(),
         })
-    } else { line.strip_prefix("event:").map(|event_type| SseEvent {
+    } else {
+        line.strip_prefix("event:").map(|event_type| SseEvent {
             event_type: Some(event_type.to_string()),
             data: String::new(),
-        }) }
+        })
+    }
 }
 
 /// Accumulates streaming events into a complete response.
@@ -72,8 +72,7 @@ impl StreamAccumulator {
                 self.usage.input_tokens = message.usage.input_tokens;
                 self.usage.output_tokens = message.usage.output_tokens;
                 self.usage.cache_read_input_tokens = message.usage.cache_read_input_tokens;
-                self.usage.cache_creation_input_tokens =
-                    message.usage.cache_creation_input_tokens;
+                self.usage.cache_creation_input_tokens = message.usage.cache_creation_input_tokens;
                 self.response = Some(message.clone());
             }
             StreamEvent::ContentBlockStart {
@@ -107,25 +106,22 @@ impl StreamAccumulator {
                             self.content_blocks.get_mut(*index)
                             && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(
                                 &self.input_json_buffers[index],
-                            ) {
-                                *input = parsed;
-                            }
+                            )
+                        {
+                            *input = parsed;
+                        }
                     }
                     ContentDelta::ThinkingDelta { thinking } => {
                         self.thinking_buffer.push_str(thinking);
-                        if let Some(ContentBlock::Thinking {
-                            thinking: t,
-                            ..
-                        }) = self.content_blocks.get_mut(*index)
+                        if let Some(ContentBlock::Thinking { thinking: t, .. }) =
+                            self.content_blocks.get_mut(*index)
                         {
                             t.push_str(thinking);
                         }
                     }
                     ContentDelta::SignatureDelta { signature } => {
-                        if let Some(ContentBlock::Thinking {
-                            signature: s,
-                            ..
-                        }) = self.content_blocks.get_mut(*index)
+                        if let Some(ContentBlock::Thinking { signature: s, .. }) =
+                            self.content_blocks.get_mut(*index)
                         {
                             let sig = s.get_or_insert_with(String::new);
                             sig.push_str(signature);

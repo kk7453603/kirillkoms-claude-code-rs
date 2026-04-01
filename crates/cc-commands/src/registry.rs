@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use crate::types::CommandDef;
+use std::collections::HashMap;
 
 pub struct CommandRegistry {
     commands: HashMap<String, &'static CommandDef>,

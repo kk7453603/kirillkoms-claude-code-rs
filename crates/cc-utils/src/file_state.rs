@@ -139,14 +139,8 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut cache = FileStateCache::new(10);
-        cache.insert(
-            PathBuf::from("/a"),
-            make_state("a", SystemTime::now()),
-        );
-        cache.insert(
-            PathBuf::from("/b"),
-            make_state("b", SystemTime::now()),
-        );
+        cache.insert(PathBuf::from("/a"), make_state("a", SystemTime::now()));
+        cache.insert(PathBuf::from("/b"), make_state("b", SystemTime::now()));
         assert_eq!(cache.len(), 2);
         cache.clear();
         assert!(cache.is_empty());

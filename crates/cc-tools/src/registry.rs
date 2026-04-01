@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::trait_def::Tool;
 use crate::tools::{
     agent::AgentTool,
     ask_user::AskUserQuestionTool,
@@ -29,6 +28,7 @@ use crate::tools::{
     web_search::WebSearchTool,
     worktree::{EnterWorktreeTool, ExitWorktreeTool},
 };
+use crate::trait_def::Tool;
 
 /// Registry for managing available tools.
 #[derive(Default)]
@@ -183,7 +183,11 @@ mod tests {
     fn test_with_defaults_has_all_tools() {
         let reg = ToolRegistry::with_defaults();
         // We register 31 tools total (some multi-struct files contribute multiple)
-        assert!(reg.len() >= 28, "Expected at least 28 tools, got {}", reg.len());
+        assert!(
+            reg.len() >= 28,
+            "Expected at least 28 tools, got {}",
+            reg.len()
+        );
     }
 
     #[test]

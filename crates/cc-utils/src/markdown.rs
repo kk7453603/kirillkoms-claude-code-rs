@@ -70,13 +70,10 @@ pub fn extract_code_blocks(text: &str) -> Vec<CodeBlock> {
     let mut blocks = Vec::new();
 
     for caps in re.captures_iter(text) {
-        let language = caps.get(1).map(|m| m.as_str().to_string()).and_then(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s)
-            }
-        });
+        let language = caps
+            .get(1)
+            .map(|m| m.as_str().to_string())
+            .and_then(|s| if s.is_empty() { None } else { Some(s) });
         let code = caps.get(2).map_or("", |m| m.as_str()).to_string();
         blocks.push(CodeBlock { language, code });
     }

@@ -24,9 +24,7 @@ pub static FAST: CommandDef = CommandDef {
                      When enabled, uses a faster but less capable model.\n\
                      Usage: /fast [on|off]",
                 )),
-                _ => Ok(CommandOutput::message(
-                    "Usage: /fast [on|off]",
-                )),
+                _ => Ok(CommandOutput::message("Usage: /fast [on|off]")),
             }
         })
     },

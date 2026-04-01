@@ -49,7 +49,7 @@ pub fn load_resume_data(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::persistence::{append_entry, TranscriptEntry};
+    use crate::persistence::{TranscriptEntry, append_entry};
 
     fn make_entry(entry_type: &str, data: serde_json::Value) -> TranscriptEntry {
         TranscriptEntry {

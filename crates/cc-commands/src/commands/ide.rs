@@ -20,7 +20,9 @@ pub static IDE: CommandDef = CommandDef {
             ];
 
             // Check for common editor env vars
-            if std::env::var("VSCODE_PID").is_ok() || std::env::var("TERM_PROGRAM").as_deref() == Ok("vscode") {
+            if std::env::var("VSCODE_PID").is_ok()
+                || std::env::var("TERM_PROGRAM").as_deref() == Ok("vscode")
+            {
                 lines.push("Detected: VS Code terminal".to_string());
             } else if std::env::var("TERMINAL_EMULATOR").as_deref() == Ok("JetBrains-JediTerm") {
                 lines.push("Detected: JetBrains terminal".to_string());

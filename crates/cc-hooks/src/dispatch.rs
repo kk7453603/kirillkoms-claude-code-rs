@@ -5,7 +5,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
 use tracing::{debug, warn};
 
-use crate::types::{HookConfig, HookEventType, HookInput, HookJsonOutput, HookOutcome, HooksConfig};
+use crate::types::{
+    HookConfig, HookEventType, HookInput, HookJsonOutput, HookOutcome, HooksConfig,
+};
 
 /// Execute a single hook command.
 ///
@@ -13,11 +15,7 @@ use crate::types::{HookConfig, HookEventType, HookInput, HookJsonOutput, HookOut
 /// environment variable and stdin. Its stdout is parsed as JSON
 /// (`HookJsonOutput`). A non-zero exit code or a "block"/"deny" decision
 /// results in a `Blocked` outcome.
-pub async fn execute_hook(
-    config: &HookConfig,
-    input: &HookInput,
-    cwd: &Path,
-) -> HookOutcome {
+pub async fn execute_hook(config: &HookConfig, input: &HookInput, cwd: &Path) -> HookOutcome {
     let input_json = match serde_json::to_string(input) {
         Ok(j) => j,
         Err(e) => {
@@ -242,7 +240,10 @@ mod tests {
         let input = test_input();
         let outcome = execute_hook(&config, &input, Path::new("/tmp")).await;
         match outcome {
-            HookOutcome::Approved { message, updated_input } => {
+            HookOutcome::Approved {
+                message,
+                updated_input,
+            } => {
                 assert!(message.is_none());
                 assert!(updated_input.is_none());
             }
@@ -383,8 +384,13 @@ mod tests {
     async fn test_dispatch_hooks_no_hooks() {
         let config = HooksConfig::new();
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
         match outcome {
             HookOutcome::NoHooks => {}
             other => panic!("Expected NoHooks, got {:?}", other),
@@ -410,8 +416,13 @@ mod tests {
         );
 
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
         match outcome {
             HookOutcome::Approved { message, .. } => {
                 // Last hook's message wins.
@@ -445,8 +456,13 @@ mod tests {
         );
 
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
         match outcome {
             HookOutcome::Blocked { reason } => {
                 assert_eq!(reason, "nope");
@@ -477,8 +493,13 @@ mod tests {
         );
 
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
 
         // The first hook returns Blocked (nonzero exit), which stops dispatch.
         // Actually, per the spec: nonzero exit = Blocked, so dispatch stops.
@@ -512,8 +533,13 @@ mod tests {
         );
 
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
         match outcome {
             HookOutcome::Approved { message, .. } => {
                 assert_eq!(message.as_deref(), Some("after-timeout"));
@@ -534,8 +560,13 @@ mod tests {
         );
 
         let input = test_input();
-        let outcome =
-            dispatch_hooks(&config, HookEventType::PreToolUse, &input, Path::new("/tmp")).await;
+        let outcome = dispatch_hooks(
+            &config,
+            HookEventType::PreToolUse,
+            &input,
+            Path::new("/tmp"),
+        )
+        .await;
         match outcome {
             HookOutcome::Approved { updated_input, .. } => {
                 let ui = updated_input.unwrap();

@@ -102,8 +102,23 @@ const DESTRUCTIVE_PATTERNS: &[&str] = &[
 
 /// Network-related command prefixes.
 const NETWORK_COMMANDS: &[&str] = &[
-    "curl", "wget", "ssh", "scp", "rsync", "ftp", "sftp", "nc", "ncat", "netcat", "telnet",
-    "ping", "nslookup", "dig", "traceroute", "npm publish", "cargo publish",
+    "curl",
+    "wget",
+    "ssh",
+    "scp",
+    "rsync",
+    "ftp",
+    "sftp",
+    "nc",
+    "ncat",
+    "netcat",
+    "telnet",
+    "ping",
+    "nslookup",
+    "dig",
+    "traceroute",
+    "npm publish",
+    "cargo publish",
 ];
 
 /// Extract the first "word" (command name) from a command string.
@@ -332,14 +347,17 @@ mod tests {
 
     #[test]
     fn test_read_only_commands() {
-        let cases = ["grep foo bar", "git status", "git log --oneline", "git diff HEAD", "cargo check", "find . -name '*.rs'"];
+        let cases = [
+            "grep foo bar",
+            "git status",
+            "git log --oneline",
+            "git diff HEAD",
+            "cargo check",
+            "find . -name '*.rs'",
+        ];
         for cmd in &cases {
             let analysis = analyze_command(cmd);
-            assert!(
-                analysis.is_read_only,
-                "Expected '{}' to be read-only",
-                cmd
-            );
+            assert!(analysis.is_read_only, "Expected '{}' to be read-only", cmd);
             assert!(
                 !analysis.is_destructive,
                 "Expected '{}' to not be destructive",
@@ -391,7 +409,12 @@ mod tests {
 
     #[test]
     fn test_network_commands() {
-        let cases = ["curl https://example.com", "wget file.tar.gz", "ssh user@host", "scp file.txt host:"];
+        let cases = [
+            "curl https://example.com",
+            "wget file.tar.gz",
+            "ssh user@host",
+            "scp file.txt host:",
+        ];
         for cmd in &cases {
             let analysis = analyze_command(cmd);
             assert!(

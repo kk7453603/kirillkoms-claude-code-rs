@@ -91,7 +91,10 @@ impl PermissionContext {
         // 5. Mode allows read-only and tool is read-only
         if self.mode.allows_read_only() && is_read_only {
             return PermissionDecision::Allow {
-                reason: format!("Read-only tool '{}' allowed by mode {}", tool_name, self.mode),
+                reason: format!(
+                    "Read-only tool '{}' allowed by mode {}",
+                    tool_name, self.mode
+                ),
             };
         }
 
@@ -151,10 +154,7 @@ mod tests {
     use crate::rules::{PermissionRule, RuleSource};
     use serde_json::json;
 
-    fn make_rule(
-        tool_name: &str,
-        behavior: PermissionBehavior,
-    ) -> PermissionRule {
+    fn make_rule(tool_name: &str, behavior: PermissionBehavior) -> PermissionRule {
         PermissionRule {
             tool_name: tool_name.to_string(),
             input_pattern: None,
@@ -180,7 +180,8 @@ mod tests {
     #[test]
     fn test_deny_rule_overrides_mode() {
         let mut ctx = PermissionContext::new(PermissionMode::Auto);
-        ctx.rules.add_rule(make_rule("Bash", PermissionBehavior::Deny));
+        ctx.rules
+            .add_rule(make_rule("Bash", PermissionBehavior::Deny));
         let decision = ctx.check_permission("Bash", &json!({}), true, false);
         assert!(decision.is_deny());
     }
@@ -210,7 +211,8 @@ mod tests {
     #[test]
     fn test_allow_rule_works() {
         let mut ctx = PermissionContext::new(PermissionMode::Default);
-        ctx.rules.add_rule(make_rule("Bash", PermissionBehavior::Allow));
+        ctx.rules
+            .add_rule(make_rule("Bash", PermissionBehavior::Allow));
         let decision = ctx.check_permission("Bash", &json!({}), false, true);
         assert!(decision.is_allow());
     }
@@ -260,8 +262,10 @@ mod tests {
     #[test]
     fn test_deny_rule_checked_before_allow_rule() {
         let mut ctx = PermissionContext::new(PermissionMode::Default);
-        ctx.rules.add_rule(make_rule("Bash", PermissionBehavior::Allow));
-        ctx.rules.add_rule(make_rule("Bash", PermissionBehavior::Deny));
+        ctx.rules
+            .add_rule(make_rule("Bash", PermissionBehavior::Allow));
+        ctx.rules
+            .add_rule(make_rule("Bash", PermissionBehavior::Deny));
         let decision = ctx.check_permission("Bash", &json!({}), false, false);
         assert!(decision.is_deny());
     }

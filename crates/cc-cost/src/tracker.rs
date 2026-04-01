@@ -610,7 +610,14 @@ mod tests {
     #[test]
     fn tracker_unknown_model_zero_cost() {
         let mut t = CostTracker::new(None);
-        t.record_api_usage("gpt-4", 1_000_000, 1_000_000, 0, 0, Duration::from_millis(100));
+        t.record_api_usage(
+            "gpt-4",
+            1_000_000,
+            1_000_000,
+            0,
+            0,
+            Duration::from_millis(100),
+        );
         assert_eq!(t.total_cost_usd(), 0.0);
         // Tokens should still be tracked
         assert_eq!(t.total_input_tokens(), 1_000_000);

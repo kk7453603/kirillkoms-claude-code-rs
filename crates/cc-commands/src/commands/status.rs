@@ -8,8 +8,7 @@ pub static STATUS: CommandDef = CommandDef {
     hidden: false,
     handler: |_args| {
         Box::pin(async {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             let mut lines = vec!["Session Status".to_string(), String::new()];
 
@@ -45,10 +44,7 @@ pub static STATUS: CommandDef = CommandDef {
                 std::env::consts::OS,
                 std::env::consts::ARCH
             ));
-            lines.push(format!(
-                "  Version:     {}",
-                env!("CARGO_PKG_VERSION")
-            ));
+            lines.push(format!("  Version:     {}", env!("CARGO_PKG_VERSION")));
 
             Ok(CommandOutput::message(&lines.join("\n")))
         })

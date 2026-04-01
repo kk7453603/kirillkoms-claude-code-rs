@@ -19,7 +19,11 @@ impl PermissionMode {
     pub fn allows_read_only(&self) -> bool {
         matches!(
             self,
-            Self::Default | Self::Auto | Self::AcceptEdits | Self::BypassPermissions | Self::DontAsk
+            Self::Default
+                | Self::Auto
+                | Self::AcceptEdits
+                | Self::BypassPermissions
+                | Self::DontAsk
         )
     }
 
@@ -69,7 +73,6 @@ impl PermissionMode {
         }
     }
 }
-
 
 impl std::fmt::Display for PermissionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

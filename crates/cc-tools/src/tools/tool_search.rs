@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult};
 
@@ -140,12 +140,13 @@ impl Tool for ToolSearchTool {
     }
 
     async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
-        let query = input
-            .get("query")
-            .and_then(|v| v.as_str())
-            .ok_or(ToolError::ValidationFailed {
-                message: "Missing 'query' parameter".into(),
-            })?;
+        let query =
+            input
+                .get("query")
+                .and_then(|v| v.as_str())
+                .ok_or(ToolError::ValidationFailed {
+                    message: "Missing 'query' parameter".into(),
+                })?;
 
         let max_results = input
             .get("max_results")
@@ -161,7 +162,13 @@ impl Tool for ToolSearchTool {
         let mut scored: Vec<(f64, &str, &str)> = self
             .tool_info
             .iter()
-            .map(|(name, desc)| (Self::score_match(query, name, desc), name.as_str(), desc.as_str()))
+            .map(|(name, desc)| {
+                (
+                    Self::score_match(query, name, desc),
+                    name.as_str(),
+                    desc.as_str(),
+                )
+            })
             .filter(|(score, _, _)| *score > 0.0)
             .collect();
 
@@ -215,21 +222,24 @@ mod tests {
 
     #[test]
     fn test_score_keyword() {
-        let score = ToolSearchTool::score_match("search", "Grep", "Search file contents with regex");
+        let score =
+            ToolSearchTool::score_match("search", "Grep", "Search file contents with regex");
         assert!(score > 0.0);
     }
 
     #[tokio::test]
     async fn test_search_finds_tools() {
         let tool = ToolSearchTool::with_tools(sample_tools());
-        let result = tool
-            .call(json!({"query": "file"}))
-            .await
-            .unwrap();
+        let result = tool.call(json!({"query": "file"})).await.unwrap();
         assert!(!result.is_error);
         let text = result.content.as_str().unwrap();
         // Should find Read, Edit, Grep, Glob (all mention "file")
-        assert!(text.contains("Read") || text.contains("Edit") || text.contains("Grep") || text.contains("Glob"));
+        assert!(
+            text.contains("Read")
+                || text.contains("Edit")
+                || text.contains("Grep")
+                || text.contains("Glob")
+        );
     }
 
     #[tokio::test]

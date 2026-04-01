@@ -9,8 +9,7 @@ pub static MCP: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             match args.as_str() {
                 "" | "list" => {
@@ -24,14 +23,13 @@ pub static MCP: CommandDef = CommandDef {
 
                     // Also check global settings
                     let global_path = cc_config::paths::global_settings_path();
-                    let global_content = std::fs::read_to_string(&global_path)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let global_content =
+                        std::fs::read_to_string(&global_path).unwrap_or_else(|_| "{}".to_string());
                     let global_val: serde_json::Value =
                         serde_json::from_str(&global_content).unwrap_or_default();
                     let global_configs = cc_mcp::config::load_mcp_configs(&global_val);
 
-                    let all_configs: Vec<_> =
-                        configs.iter().chain(global_configs.iter()).collect();
+                    let all_configs: Vec<_> = configs.iter().chain(global_configs.iter()).collect();
 
                     if all_configs.is_empty() {
                         return Ok(CommandOutput::message(
@@ -48,30 +46,17 @@ pub static MCP: CommandDef = CommandDef {
                         ));
                     }
 
-                    let mut lines = vec![format!(
-                        "MCP Servers ({}):",
-                        all_configs.len()
-                    )];
+                    let mut lines = vec![format!("MCP Servers ({}):", all_configs.len())];
                     for cfg in &all_configs {
-                        let status = if cfg.enabled {
-                            "enabled"
-                        } else {
-                            "disabled"
-                        };
-                        lines.push(format!(
-                            "\n  {} [{}]",
-                            cfg.name, status
-                        ));
+                        let status = if cfg.enabled { "enabled" } else { "disabled" };
+                        lines.push(format!("\n  {} [{}]", cfg.name, status));
                         lines.push(format!(
                             "    command: {} {}",
                             cfg.command,
                             cfg.args.join(" ")
                         ));
                         if !cfg.env.is_empty() {
-                            lines.push(format!(
-                                "    env: {} vars",
-                                cfg.env.len()
-                            ));
+                            lines.push(format!("    env: {} vars", cfg.env.len()));
                         }
                     }
                     Ok(CommandOutput::message(&lines.join("\n")))

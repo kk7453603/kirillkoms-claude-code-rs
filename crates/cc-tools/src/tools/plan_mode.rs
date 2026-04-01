@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::trait_def::{Tool, ToolError, ToolResult, ValidationResult};
 
@@ -174,7 +174,13 @@ mod tests {
         let tool = ExitPlanModeV2Tool::new();
         let result = tool.call(json!({})).await.unwrap();
         assert!(!result.is_error);
-        assert!(result.content.as_str().unwrap().contains("Exited plan mode"));
+        assert!(
+            result
+                .content
+                .as_str()
+                .unwrap()
+                .contains("Exited plan mode")
+        );
     }
 
     #[tokio::test]

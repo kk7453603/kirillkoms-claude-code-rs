@@ -9,9 +9,7 @@ pub static UPGRADE: CommandDef = CommandDef {
     handler: |_args| {
         Box::pin(async {
             let current = env!("CARGO_PKG_VERSION");
-            let mut lines = vec![
-                format!("Current version: {}", current),
-            ];
+            let mut lines = vec![format!("Current version: {}", current)];
 
             // Check if installed via cargo
             let cargo_check = cc_utils::shell::execute_command(

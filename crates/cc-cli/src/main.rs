@@ -21,13 +21,11 @@ async fn main() -> anyhow::Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env().add_directive(
-                if args.verbose {
-                    "debug".parse()?
-                } else {
-                    "warn".parse()?
-                },
-            ),
+            tracing_subscriber::EnvFilter::from_default_env().add_directive(if args.verbose {
+                "debug".parse()?
+            } else {
+                "warn".parse()?
+            }),
         )
         .init();
 
@@ -101,9 +99,9 @@ async fn create_api_client() -> anyhow::Result<Arc<dyn cc_api::client::ApiClient
         }
     };
 
-    let client = cc_api::client::create_client(config).await.map_err(|e| {
-        anyhow::anyhow!("Failed to create API client: {}", e)
-    })?;
+    let client = cc_api::client::create_client(config)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create API client: {}", e))?;
 
     Ok(Arc::from(client))
 }
@@ -136,8 +134,8 @@ async fn build_engine(
     engine.set_system_context(ctx);
 
     // Set up permission context based on --permission-mode
-    let permission_mode = PermissionMode::from_str_opt(&args.permission_mode)
-        .unwrap_or(PermissionMode::Default);
+    let permission_mode =
+        PermissionMode::from_str_opt(&args.permission_mode).unwrap_or(PermissionMode::Default);
     let permission_ctx = PermissionContext::new(permission_mode);
 
     // Build execution context with hooks config and permission context
@@ -309,8 +307,8 @@ async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::R
         .model
         .as_deref()
         .unwrap_or(cc_config::model_config::default_model());
-    let model_display = cc_config::model_config::resolve_model_alias(model_str)
-        .unwrap_or(model_str);
+    let model_display =
+        cc_config::model_config::resolve_model_alias(model_str).unwrap_or(model_str);
 
     println!("Claude Code v{}", env!("CARGO_PKG_VERSION"));
     println!("Model: {}", model_display);
@@ -390,7 +388,10 @@ async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::R
                     }
                 }
             } else {
-                eprintln!("Unknown command: /{}. Type /help for available commands.", cmd_name);
+                eprintln!(
+                    "Unknown command: /{}. Type /help for available commands.",
+                    cmd_name
+                );
             }
 
             continue;
@@ -446,10 +447,7 @@ async fn stream_response(
                 output_tokens,
             } => {
                 if verbose {
-                    eprintln!(
-                        "[Tokens: {} in, {} out]",
-                        input_tokens, output_tokens
-                    );
+                    eprintln!("[Tokens: {} in, {} out]", input_tokens, output_tokens);
                 }
             }
         }

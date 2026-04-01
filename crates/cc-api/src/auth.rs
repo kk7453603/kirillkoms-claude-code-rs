@@ -12,7 +12,10 @@ impl ApiProvider {
     /// Detect the provider from environment variables.
     pub fn from_env() -> Self {
         if std::env::var("CLAUDE_CODE_USE_BEDROCK").ok().as_deref() == Some("1")
-            || std::env::var("AWS_REGION").is_ok() && std::env::var("ANTHROPIC_MODEL").ok().map_or(false, |m| m.starts_with("anthropic."))
+            || std::env::var("AWS_REGION").is_ok()
+                && std::env::var("ANTHROPIC_MODEL")
+                    .ok()
+                    .map_or(false, |m| m.starts_with("anthropic."))
         {
             return ApiProvider::Bedrock;
         }

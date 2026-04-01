@@ -89,7 +89,7 @@ pub fn truncate_to_tokens(text: &str, max_tokens: usize) -> String {
 mod tests {
     use super::*;
     use cc_types::content::ContentBlock;
-    use cc_types::message::{UserMessage, AssistantMessage, SystemMessage};
+    use cc_types::message::{AssistantMessage, SystemMessage, UserMessage};
 
     #[test]
     fn test_estimate_tokens_empty() {

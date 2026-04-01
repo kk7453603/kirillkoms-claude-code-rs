@@ -9,8 +9,7 @@ pub static MEMORY: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let files = cc_config::claude_md::discover_claude_md_files(&cwd);
 
             match args.as_str() {
@@ -80,9 +79,7 @@ pub static MEMORY: CommandDef = CommandDef {
                         Ok(CommandOutput::message(&paths.join("\n")))
                     }
                 }
-                _ => Ok(CommandOutput::message(
-                    "Usage: /memory [view|edit|path]",
-                )),
+                _ => Ok(CommandOutput::message("Usage: /memory [view|edit|path]")),
             }
         })
     },

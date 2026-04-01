@@ -9,8 +9,7 @@ pub static HOOKS: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             match args.as_str() {
                 "" | "list" => {
@@ -27,10 +26,7 @@ pub static HOOKS: CommandDef = CommandDef {
                                     for hook in hook_list {
                                         lines.push(format!("    - {}", hook.command));
                                         if let Some(timeout) = hook.timeout {
-                                            lines.push(format!(
-                                                "      timeout: {}ms",
-                                                timeout
-                                            ));
+                                            lines.push(format!("      timeout: {}ms", timeout));
                                         }
                                     }
                                 }

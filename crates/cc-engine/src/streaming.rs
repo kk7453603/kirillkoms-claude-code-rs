@@ -43,8 +43,7 @@ impl StreamState {
                 }
                 // If this is a tool_use block, start tracking the JSON input buffer
                 if let ContentBlock::ToolUse { id, name, .. } = &content_block {
-                    self.tool_input_buffers
-                        .push((index, String::new()));
+                    self.tool_input_buffers.push((index, String::new()));
                     // We don't add to tool_uses yet; we do that at ContentBlockStop
                     let _ = (id, name); // avoid unused warnings
                 }
@@ -55,17 +54,15 @@ impl StreamState {
                     ContentDelta::TextDelta { text } => {
                         self.text_parts.push(text.clone());
                         // Also update the content block in place
-                        if let Some(ContentBlock::Text {
-                            text: existing,
-                        }) = self.content_blocks.get_mut(index)
+                        if let Some(ContentBlock::Text { text: existing }) =
+                            self.content_blocks.get_mut(index)
                         {
                             existing.push_str(&text);
                         }
                     }
                     ContentDelta::ThinkingDelta { thinking } => {
                         if let Some(ContentBlock::Thinking {
-                            thinking: existing,
-                            ..
+                            thinking: existing, ..
                         }) = self.content_blocks.get_mut(index)
                         {
                             existing.push_str(&thinking);
@@ -94,8 +91,7 @@ impl StreamState {
             }
             StreamEvent::ContentBlockStop { index } => {
                 // If this was a tool_use block, finalize it
-                if let Some(ContentBlock::ToolUse { id, name, .. }) =
-                    self.content_blocks.get(index)
+                if let Some(ContentBlock::ToolUse { id, name, .. }) = self.content_blocks.get(index)
                 {
                     let id = id.clone();
                     let name = name.clone();
@@ -107,10 +103,8 @@ impl StreamState {
                         .map(|(_, buf)| buf.clone())
                         .unwrap_or_default();
 
-                    let input: serde_json::Value =
-                        serde_json::from_str(&input_json).unwrap_or(serde_json::Value::Object(
-                            serde_json::Map::new(),
-                        ));
+                    let input: serde_json::Value = serde_json::from_str(&input_json)
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
                     // Update the content block with parsed input
                     if let Some(ContentBlock::ToolUse {
@@ -354,11 +348,13 @@ mod tests {
                 message: "Server overloaded".to_string(),
             },
         });
-        assert!(state
-            .stop_reason
-            .as_ref()
-            .unwrap()
-            .contains("Server overloaded"));
+        assert!(
+            state
+                .stop_reason
+                .as_ref()
+                .unwrap()
+                .contains("Server overloaded")
+        );
     }
 
     #[test]

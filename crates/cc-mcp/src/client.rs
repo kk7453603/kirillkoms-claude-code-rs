@@ -9,7 +9,11 @@ use crate::types::*;
 #[async_trait]
 pub trait McpClient: Send + Sync {
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>, McpError>;
-    async fn call_tool(&self, name: &str, input: serde_json::Value) -> Result<McpToolResult, McpError>;
+    async fn call_tool(
+        &self,
+        name: &str,
+        input: serde_json::Value,
+    ) -> Result<McpToolResult, McpError>;
     async fn list_resources(&self) -> Result<Vec<McpResource>, McpError>;
     async fn read_resource(&self, uri: &str) -> Result<serde_json::Value, McpError>;
 }
@@ -102,11 +106,16 @@ impl StdioMcpClient {
         inner.child = Some(child);
 
         // Send initialize request
-        Self::send_request_inner(&mut inner, "initialize", Some(serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": { "name": "claude-code-rs", "version": "0.1.0" }
-        }))).await?;
+        Self::send_request_inner(
+            &mut inner,
+            "initialize",
+            Some(serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": { "name": "claude-code-rs", "version": "0.1.0" }
+            })),
+        )
+        .await?;
 
         Ok(())
     }
@@ -126,17 +135,24 @@ impl StdioMcpClient {
             params,
         };
 
-        let mut json = serde_json::to_string(&request)
-            .map_err(|e| McpError::Protocol(e.to_string()))?;
+        let mut json =
+            serde_json::to_string(&request).map_err(|e| McpError::Protocol(e.to_string()))?;
         json.push('\n');
 
-        let stdin = inner.stdin.as_mut()
+        let stdin = inner
+            .stdin
+            .as_mut()
             .ok_or_else(|| McpError::Connection("Not connected".into()))?;
-        stdin.write_all(json.as_bytes()).await.map_err(McpError::Io)?;
+        stdin
+            .write_all(json.as_bytes())
+            .await
+            .map_err(McpError::Io)?;
         stdin.flush().await.map_err(McpError::Io)?;
 
         // Read response line(s), skipping any JSON-RPC notifications (no "id" field)
-        let stdout = inner.stdout.as_mut()
+        let stdout = inner
+            .stdout
+            .as_mut()
             .ok_or_else(|| McpError::Connection("Not connected".into()))?;
 
         loop {
@@ -154,9 +170,14 @@ impl StdioMcpClient {
             // Try to parse as a response (has "id" field)
             if let Ok(response) = serde_json::from_str::<JsonRpcResponse>(trimmed) {
                 if let Some(error) = response.error {
-                    return Err(McpError::Protocol(format!("{}: {}", error.code, error.message)));
+                    return Err(McpError::Protocol(format!(
+                        "{}: {}",
+                        error.code, error.message
+                    )));
                 }
-                return response.result.ok_or_else(|| McpError::Protocol("No result in response".into()));
+                return response
+                    .result
+                    .ok_or_else(|| McpError::Protocol("No result in response".into()));
             }
             // If it's not a valid response (e.g. a notification), skip and read next line
         }
@@ -177,7 +198,8 @@ impl McpClient for StdioMcpClient {
     async fn list_tools(&self) -> Result<Vec<McpToolDefinition>, McpError> {
         let result = self.send_request("tools/list", None).await?;
 
-        let tools_value = result.get("tools")
+        let tools_value = result
+            .get("tools")
             .ok_or_else(|| McpError::Protocol("Response missing 'tools' field".into()))?;
 
         let tools: Vec<McpToolDefinition> = serde_json::from_value(tools_value.clone())
@@ -186,17 +208,28 @@ impl McpClient for StdioMcpClient {
         Ok(tools)
     }
 
-    async fn call_tool(&self, name: &str, input: serde_json::Value) -> Result<McpToolResult, McpError> {
-        let result = self.send_request("tools/call", Some(serde_json::json!({
-            "name": name,
-            "arguments": input
-        }))).await?;
+    async fn call_tool(
+        &self,
+        name: &str,
+        input: serde_json::Value,
+    ) -> Result<McpToolResult, McpError> {
+        let result = self
+            .send_request(
+                "tools/call",
+                Some(serde_json::json!({
+                    "name": name,
+                    "arguments": input
+                })),
+            )
+            .await?;
 
-        let is_error = result.get("isError")
+        let is_error = result
+            .get("isError")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let content = result.get("content")
+        let content = result
+            .get("content")
             .cloned()
             .unwrap_or(serde_json::Value::Null);
 
@@ -206,7 +239,8 @@ impl McpClient for StdioMcpClient {
     async fn list_resources(&self) -> Result<Vec<McpResource>, McpError> {
         let result = self.send_request("resources/list", None).await?;
 
-        let resources_value = result.get("resources")
+        let resources_value = result
+            .get("resources")
             .ok_or_else(|| McpError::Protocol("Response missing 'resources' field".into()))?;
 
         let resources: Vec<McpResource> = serde_json::from_value(resources_value.clone())
@@ -216,9 +250,14 @@ impl McpClient for StdioMcpClient {
     }
 
     async fn read_resource(&self, uri: &str) -> Result<serde_json::Value, McpError> {
-        let result = self.send_request("resources/read", Some(serde_json::json!({
-            "uri": uri
-        }))).await?;
+        let result = self
+            .send_request(
+                "resources/read",
+                Some(serde_json::json!({
+                    "uri": uri
+                })),
+            )
+            .await?;
 
         Ok(result)
     }
@@ -326,7 +365,10 @@ mod tests {
     #[tokio::test]
     async fn test_call_tool_not_connected() {
         let client = StdioMcpClient::new(make_config());
-        let err = client.call_tool("test", serde_json::json!({})).await.unwrap_err();
+        let err = client
+            .call_tool("test", serde_json::json!({}))
+            .await
+            .unwrap_err();
         assert!(matches!(err, McpError::Connection(_)));
     }
 

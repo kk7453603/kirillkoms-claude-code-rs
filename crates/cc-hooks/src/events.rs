@@ -82,10 +82,7 @@ mod tests {
         );
         assert_eq!(input.hook_event, "PreToolUse");
         assert_eq!(input.tool_name.as_deref(), Some("Bash"));
-        assert_eq!(
-            input.tool_input.as_ref().unwrap()["command"],
-            "ls -la"
-        );
+        assert_eq!(input.tool_input.as_ref().unwrap()["command"], "ls -la");
         assert!(input.tool_output.is_none());
         assert_eq!(input.session_id.as_deref(), Some("sess-1"));
         assert!(input.cwd.is_none());
@@ -125,10 +122,7 @@ mod tests {
     fn test_user_prompt_submit_input() {
         let input = user_prompt_submit_input("fix the bug", Some("sess-7"));
         assert_eq!(input.hook_event, "UserPromptSubmit");
-        assert_eq!(
-            input.tool_input.as_ref().unwrap()["prompt"],
-            "fix the bug"
-        );
+        assert_eq!(input.tool_input.as_ref().unwrap()["prompt"], "fix the bug");
         assert_eq!(input.session_id.as_deref(), Some("sess-7"));
     }
 

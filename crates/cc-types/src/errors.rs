@@ -11,21 +11,13 @@ pub enum CcError {
     },
 
     #[error("Tool error: {message}")]
-    Tool {
-        tool_name: String,
-        message: String,
-    },
+    Tool { tool_name: String, message: String },
 
     #[error("Permission denied: {message}")]
-    PermissionDenied {
-        tool_name: String,
-        message: String,
-    },
+    PermissionDenied { tool_name: String, message: String },
 
     #[error("Prompt too long: {message}")]
-    PromptTooLong {
-        message: String,
-    },
+    PromptTooLong { message: String },
 
     #[error("Rate limited: {message}")]
     RateLimited {
@@ -34,24 +26,16 @@ pub enum CcError {
     },
 
     #[error("Overloaded: {message}")]
-    Overloaded {
-        message: String,
-    },
+    Overloaded { message: String },
 
     #[error("Configuration error: {message}")]
-    Config {
-        message: String,
-    },
+    Config { message: String },
 
     #[error("Session error: {message}")]
-    Session {
-        message: String,
-    },
+    Session { message: String },
 
     #[error("MCP error: {message}")]
-    Mcp {
-        message: String,
-    },
+    Mcp { message: String },
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

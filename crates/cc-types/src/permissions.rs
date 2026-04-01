@@ -35,7 +35,10 @@ impl<'de> Deserialize<'de> for PermissionBehavior {
             "allow" => Ok(PermissionBehavior::Allow),
             "deny" => Ok(PermissionBehavior::Deny),
             "ask" => Ok(PermissionBehavior::Ask),
-            _ => Err(serde::de::Error::unknown_variant(&s, &["allow", "deny", "ask"])),
+            _ => Err(serde::de::Error::unknown_variant(
+                &s,
+                &["allow", "deny", "ask"],
+            )),
         }
     }
 }
@@ -63,9 +66,16 @@ pub enum PermissionRuleSource {
 
 #[derive(Debug, Clone)]
 pub enum PermissionDecision {
-    Allow { message: Option<String> },
-    Ask { message: String, allow_rules: Vec<PermissionRule> },
-    Deny { message: String },
+    Allow {
+        message: Option<String>,
+    },
+    Ask {
+        message: String,
+        allow_rules: Vec<PermissionRule>,
+    },
+    Deny {
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone)]

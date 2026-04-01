@@ -16,11 +16,7 @@ pub struct VertexApiClient {
 }
 
 impl VertexApiClient {
-    pub fn new(
-        project_id: String,
-        region: String,
-        model_id: String,
-    ) -> Result<Self, ApiError> {
+    pub fn new(project_id: String, region: String, model_id: String) -> Result<Self, ApiError> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "content-type",
@@ -192,18 +188,19 @@ impl ApiClient for VertexApiClient {
             })?;
 
         let status = response.status().as_u16();
-        let body_text = response.text().await.map_err(|e| ApiError::ConnectionError {
-            message: format!("Failed to read response body: {}", e),
-        })?;
+        let body_text = response
+            .text()
+            .await
+            .map_err(|e| ApiError::ConnectionError {
+                message: format!("Failed to read response body: {}", e),
+            })?;
 
         if status != 200 {
             return Err(ApiError::from_status(status, &body_text));
         }
 
-        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| {
-            ApiError::InvalidRequest {
-                message: format!("Failed to parse response: {}", e),
-            }
+        serde_json::from_str::<MessagesResponse>(&body_text).map_err(|e| ApiError::InvalidRequest {
+            message: format!("Failed to parse response: {}", e),
         })
     }
 }

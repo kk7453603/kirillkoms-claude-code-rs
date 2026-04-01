@@ -18,9 +18,7 @@ pub static BRIDGE: CommandDef = CommandDef {
                     "Attempting to establish bridge connection...\n\
                      Bridge connection is not available in the current environment.",
                 )),
-                "disconnect" => Ok(CommandOutput::message(
-                    "Bridge disconnected.",
-                )),
+                "disconnect" => Ok(CommandOutput::message("Bridge disconnected.")),
                 "" => Ok(CommandOutput::message(
                     "Bridge connection manager.\n\n\
                      Usage: /bridge [status|connect|disconnect]\n\n\

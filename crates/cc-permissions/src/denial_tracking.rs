@@ -1,5 +1,4 @@
 /// Track permission denials per tool to avoid repeatedly asking the user.
-
 use std::collections::HashMap;
 
 /// Tracks how many times each tool has been denied permission.

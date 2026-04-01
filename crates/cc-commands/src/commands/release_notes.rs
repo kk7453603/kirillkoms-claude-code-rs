@@ -9,8 +9,7 @@ pub static RELEASE_NOTES: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
-            let cwd = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             if !cc_utils::git::is_git_repo(&cwd).await {
                 return Ok(CommandOutput::message("Not in a git repository."));
@@ -48,9 +47,7 @@ pub static RELEASE_NOTES: CommandDef = CommandDef {
                         lines.push(format!("  - {}", line));
                     }
                     lines.push(String::new());
-                    lines.push(
-                        "Ask the AI to format these as proper release notes.".to_string(),
-                    );
+                    lines.push("Ask the AI to format these as proper release notes.".to_string());
                     Ok(CommandOutput::message(&lines.join("\n")))
                 }
                 Ok(_) => Ok(CommandOutput::message(&format!(

@@ -61,10 +61,11 @@ impl PermissionRule {
 
         // Glob-style matching: support wildcards (* and ?)
         if (self.tool_name.contains('*') || self.tool_name.contains('?'))
-            && let Ok(glob) = globset::Glob::new(&self.tool_name) {
-                let matcher = glob.compile_matcher();
-                return matcher.is_match(tool_name);
-            }
+            && let Ok(glob) = globset::Glob::new(&self.tool_name)
+        {
+            let matcher = glob.compile_matcher();
+            return matcher.is_match(tool_name);
+        }
 
         false
     }

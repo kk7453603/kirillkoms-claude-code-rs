@@ -163,7 +163,11 @@ mod tests {
         })];
         let memories = extract_memories(&messages);
         assert!(memories.len() >= 1);
-        assert!(memories.iter().any(|m| m.category == MemoryCategory::BugFix));
+        assert!(
+            memories
+                .iter()
+                .any(|m| m.category == MemoryCategory::BugFix)
+        );
     }
 
     #[test]

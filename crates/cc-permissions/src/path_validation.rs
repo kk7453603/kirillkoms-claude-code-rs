@@ -1,7 +1,6 @@
 /// Filesystem path security validation.
 ///
 /// Validates that paths are within allowed directories and detects sensitive files.
-
 use std::path::{Component, Path, PathBuf};
 
 /// Validate that a path is within the project root or one of the additional allowed directories.
@@ -305,7 +304,9 @@ mod tests {
     #[test]
     fn test_normal_files_not_sensitive() {
         assert!(!is_sensitive_path(Path::new("src/main.rs")));
-        assert!(!is_sensitive_path(Path::new("/home/user/project/README.md")));
+        assert!(!is_sensitive_path(Path::new(
+            "/home/user/project/README.md"
+        )));
         assert!(!is_sensitive_path(Path::new("Cargo.toml")));
         assert!(!is_sensitive_path(Path::new("package.json")));
         assert!(!is_sensitive_path(Path::new(".gitignore")));
@@ -318,12 +319,16 @@ mod tests {
 
     #[test]
     fn test_docker_dir_sensitive() {
-        assert!(is_sensitive_path(Path::new("/home/user/.docker/config.json")));
+        assert!(is_sensitive_path(Path::new(
+            "/home/user/.docker/config.json"
+        )));
     }
 
     #[test]
     fn test_gnupg_dir_sensitive() {
-        assert!(is_sensitive_path(Path::new("/home/user/.gnupg/trustdb.gpg")));
+        assert!(is_sensitive_path(Path::new(
+            "/home/user/.gnupg/trustdb.gpg"
+        )));
     }
 
     #[test]

@@ -15,8 +15,7 @@ pub static RESUME: CommandDef = CommandDef {
                 // Show recent sessions to pick from
                 let history_path = cc_config::paths::history_path();
                 let recent =
-                    cc_session::history::read_recent_history(&history_path, 10)
-                        .unwrap_or_default();
+                    cc_session::history::read_recent_history(&history_path, 10).unwrap_or_default();
 
                 if recent.is_empty() {
                     // Fall back to listing session dirs
@@ -27,15 +26,12 @@ pub static RESUME: CommandDef = CommandDef {
                             ));
                         }
                         Ok(sessions) => {
-                            let mut lines =
-                                vec!["Recent sessions:".to_string()];
+                            let mut lines = vec!["Recent sessions:".to_string()];
                             for sid in sessions.iter().rev().take(10) {
                                 lines.push(format!("  {}", sid));
                             }
                             lines.push(String::new());
-                            lines.push(
-                                "Resume with: /resume <session_id>".to_string(),
-                            );
+                            lines.push("Resume with: /resume <session_id>".to_string());
                             return Ok(CommandOutput::message(&lines.join("\n")));
                         }
                         Err(_) => {
@@ -48,10 +44,7 @@ pub static RESUME: CommandDef = CommandDef {
 
                 let mut lines = vec!["Recent sessions:".to_string()];
                 for entry in recent.iter().rev() {
-                    let project = entry
-                        .project_root
-                        .as_deref()
-                        .unwrap_or("unknown");
+                    let project = entry.project_root.as_deref().unwrap_or("unknown");
                     lines.push(format!(
                         "  {} - \"{}\" ({})",
                         entry.session_id,
@@ -67,10 +60,7 @@ pub static RESUME: CommandDef = CommandDef {
             // Try to load the session
             match cc_session::resume::load_resume_data(&sessions_dir, &args) {
                 Ok(data) => {
-                    let project = data
-                        .project_root
-                        .as_deref()
-                        .unwrap_or("unknown");
+                    let project = data.project_root.as_deref().unwrap_or("unknown");
                     Ok(CommandOutput::message(&format!(
                         "Resuming session: {}\n  Messages: {}\n  Project: {}",
                         data.session_id,

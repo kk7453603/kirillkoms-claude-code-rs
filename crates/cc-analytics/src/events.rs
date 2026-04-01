@@ -1,5 +1,5 @@
-use serde::Serialize;
 use chrono::Utc;
+use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AnalyticsEvent {
@@ -69,8 +69,7 @@ mod tests {
 
     #[test]
     fn test_event_with_session() {
-        let event = AnalyticsEvent::new("evt", serde_json::json!({}))
-            .with_session("session-123");
+        let event = AnalyticsEvent::new("evt", serde_json::json!({})).with_session("session-123");
         assert_eq!(event.session_id, Some("session-123".to_string()));
     }
 
@@ -101,8 +100,8 @@ mod tests {
 
     #[test]
     fn test_event_serialization() {
-        let event = AnalyticsEvent::new("test", serde_json::json!({"count": 42}))
-            .with_session("s1");
+        let event =
+            AnalyticsEvent::new("test", serde_json::json!({"count": 42})).with_session("s1");
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("\"event_name\":\"test\""));
         assert!(json.contains("\"session_id\":\"s1\""));

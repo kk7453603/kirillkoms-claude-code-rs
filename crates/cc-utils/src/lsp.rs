@@ -79,11 +79,7 @@ impl LspClient for StubLspClient {
     ) -> Result<Vec<Location>, LspError> {
         Err(LspError::NotAvailable)
     }
-    async fn hover(
-        &self,
-        _file: &str,
-        _pos: Position,
-    ) -> Result<Option<HoverResult>, LspError> {
+    async fn hover(&self, _file: &str, _pos: Position) -> Result<Option<HoverResult>, LspError> {
         Err(LspError::NotAvailable)
     }
     async fn document_symbols(&self, _file: &str) -> Result<Vec<SymbolInfo>, LspError> {
@@ -279,10 +275,7 @@ impl StdioLspClient {
     // -- low-level framing ------------------------------------------------
 
     /// Write a Content-Length framed message to the given writer.
-    async fn write_message(
-        stdin: &mut ChildStdin,
-        body: &[u8],
-    ) -> Result<(), LspError> {
+    async fn write_message(stdin: &mut ChildStdin, body: &[u8]) -> Result<(), LspError> {
         let header = format!("Content-Length: {}\r\n\r\n", body.len());
         stdin
             .write_all(header.as_bytes())
@@ -300,9 +293,7 @@ impl StdioLspClient {
     }
 
     /// Read one Content-Length framed message from the given reader.
-    async fn read_message(
-        stdout: &mut BufReader<ChildStdout>,
-    ) -> Result<String, LspError> {
+    async fn read_message(stdout: &mut BufReader<ChildStdout>) -> Result<String, LspError> {
         // Read headers until we find the blank line (\r\n\r\n).
         let mut content_length: Option<usize> = None;
         loop {
@@ -385,10 +376,7 @@ impl StdioLspClient {
             }
 
             if let Some(err) = resp.error {
-                return Err(LspError::Protocol(format!(
-                    "{}: {}",
-                    err.code, err.message
-                )));
+                return Err(LspError::Protocol(format!("{}: {}", err.code, err.message)));
             }
 
             return Ok(resp.result.unwrap_or(serde_json::Value::Null));
@@ -485,22 +473,14 @@ impl StdioLspClient {
 
 #[async_trait::async_trait]
 impl LspClient for StdioLspClient {
-    async fn go_to_definition(
-        &self,
-        file: &str,
-        pos: Position,
-    ) -> Result<Vec<Location>, LspError> {
+    async fn go_to_definition(&self, file: &str, pos: Position) -> Result<Vec<Location>, LspError> {
         self.ensure_file_open(file).await?;
         let params = Self::text_document_position(file, &pos);
         let result = self.send_request("textDocument/definition", params).await?;
         Ok(parse_locations(&result))
     }
 
-    async fn find_references(
-        &self,
-        file: &str,
-        pos: Position,
-    ) -> Result<Vec<Location>, LspError> {
+    async fn find_references(&self, file: &str, pos: Position) -> Result<Vec<Location>, LspError> {
         self.ensure_file_open(file).await?;
         let mut params = Self::text_document_position(file, &pos);
         // References requires a context.includeDeclaration field.
@@ -512,11 +492,7 @@ impl LspClient for StdioLspClient {
         Ok(parse_locations(&result))
     }
 
-    async fn hover(
-        &self,
-        file: &str,
-        pos: Position,
-    ) -> Result<Option<HoverResult>, LspError> {
+    async fn hover(&self, file: &str, pos: Position) -> Result<Option<HoverResult>, LspError> {
         self.ensure_file_open(file).await?;
         let params = Self::text_document_position(file, &pos);
         let result = self.send_request("textDocument/hover", params).await?;
@@ -823,10 +799,7 @@ mod tests {
         drop(stdin);
 
         let mut output = String::new();
-        reader
-            .read_to_string(&mut output)
-            .await
-            .unwrap();
+        reader.read_to_string(&mut output).await.unwrap();
 
         let expected = format!(
             "Content-Length: {}\r\n\r\n{}",
@@ -924,11 +897,11 @@ mod tests {
 
     #[test]
     fn test_path_to_uri() {
-        assert_eq!(path_to_uri("/home/user/file.rs"), "file:///home/user/file.rs");
         assert_eq!(
-            path_to_uri("file:///already/uri"),
-            "file:///already/uri"
+            path_to_uri("/home/user/file.rs"),
+            "file:///home/user/file.rs"
         );
+        assert_eq!(path_to_uri("file:///already/uri"), "file:///already/uri");
     }
 
     #[test]
@@ -1079,18 +1052,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_stdio_lsp_client_send_request_not_initialized() {
-        let client = StdioLspClient::new(
-            "echo".to_string(),
-            vec![],
-            "file:///tmp".to_string(),
-        );
+        let client = StdioLspClient::new("echo".to_string(), vec![], "file:///tmp".to_string());
         let result = client
             .send_request("textDocument/definition", serde_json::json!({}))
             .await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("not initialized"));
+        assert!(result.unwrap_err().to_string().contains("not initialized"));
     }
 }

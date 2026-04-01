@@ -14,9 +14,7 @@ pub static STATUSLINE: CommandDef = CommandDef {
                     "Status line enabled.\n\
                      The status line will show model, token usage, and session info.",
                 )),
-                "off" => Ok(CommandOutput::message(
-                    "Status line disabled.",
-                )),
+                "off" => Ok(CommandOutput::message("Status line disabled.")),
                 "" => Ok(CommandOutput::message(
                     "Status line configuration.\n\n\
                      The status line shows real-time information at the bottom of the terminal:\n  \

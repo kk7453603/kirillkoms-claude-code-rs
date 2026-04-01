@@ -45,10 +45,7 @@ pub static STATS: CommandDef = CommandDef {
                 ));
             }
             if usage.web_search_requests > 0 {
-                lines.push(format!(
-                    "  Web searches:    {}",
-                    usage.web_search_requests
-                ));
+                lines.push(format!("  Web searches:    {}", usage.web_search_requests));
             }
             lines.push(format!(
                 "  API time:        {}",

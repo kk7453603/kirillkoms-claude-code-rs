@@ -12,30 +12,23 @@ pub static SESSION: CommandDef = CommandDef {
             let sessions_dir = cc_config::paths::sessions_dir();
 
             match args.split_whitespace().collect::<Vec<_>>().as_slice() {
-                [] | ["list"] => {
-                    match cc_session::storage::list_sessions(&sessions_dir) {
-                        Ok(sessions) if sessions.is_empty() => {
-                            Ok(CommandOutput::message("No saved sessions."))
-                        }
-                        Ok(sessions) => {
-                            let mut lines = vec![format!(
-                                "Sessions ({}):",
-                                sessions.len()
-                            )];
-                            for sid in &sessions {
-                                lines.push(format!("  {}", sid));
-                            }
-                            lines.push(String::new());
-                            lines.push(
-                                "Resume a session: /resume <session_id>".to_string(),
-                            );
-                            Ok(CommandOutput::message(&lines.join("\n")))
-                        }
-                        Err(_) => Ok(CommandOutput::message(
-                            "No sessions directory found. Sessions will be created automatically.",
-                        )),
+                [] | ["list"] => match cc_session::storage::list_sessions(&sessions_dir) {
+                    Ok(sessions) if sessions.is_empty() => {
+                        Ok(CommandOutput::message("No saved sessions."))
                     }
-                }
+                    Ok(sessions) => {
+                        let mut lines = vec![format!("Sessions ({}):", sessions.len())];
+                        for sid in &sessions {
+                            lines.push(format!("  {}", sid));
+                        }
+                        lines.push(String::new());
+                        lines.push("Resume a session: /resume <session_id>".to_string());
+                        Ok(CommandOutput::message(&lines.join("\n")))
+                    }
+                    Err(_) => Ok(CommandOutput::message(
+                        "No sessions directory found. Sessions will be created automatically.",
+                    )),
+                },
                 ["new"] => {
                     let id = uuid::Uuid::new_v4().to_string();
                     Ok(CommandOutput::message(&format!(

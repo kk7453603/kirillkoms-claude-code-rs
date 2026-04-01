@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Validate tool input against JSON schema.
 ///
@@ -10,9 +10,10 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
     if let Some(required) = schema.get("required").and_then(|r| r.as_array()) {
         for req in required {
             if let Some(field_name) = req.as_str()
-                && input.get(field_name).is_none() {
-                    errors.push(format!("Missing required field: '{}'", field_name));
-                }
+                && input.get(field_name).is_none()
+            {
+                errors.push(format!("Missing required field: '{}'", field_name));
+            }
         }
     }
 
@@ -42,33 +43,32 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
 
                 // Validate enum values
                 if let Some(enum_values) = prop_schema.get("enum").and_then(|e| e.as_array())
-                    && !enum_values.contains(value) {
-                        errors.push(format!(
-                            "Field '{}' must be one of: {:?}",
-                            prop_name,
-                            enum_values
-                                .iter()
-                                .filter_map(|v| v.as_str())
-                                .collect::<Vec<_>>()
-                        ));
-                    }
+                    && !enum_values.contains(value)
+                {
+                    errors.push(format!(
+                        "Field '{}' must be one of: {:?}",
+                        prop_name,
+                        enum_values
+                            .iter()
+                            .filter_map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                    ));
+                }
             }
         }
     }
 
     // Check additionalProperties if set to false
-    if schema
-        .get("additionalProperties")
-        .and_then(|v| v.as_bool())
-        == Some(false)
+    if schema.get("additionalProperties").and_then(|v| v.as_bool()) == Some(false)
         && let Some(input_obj) = input.as_object()
-            && let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) {
-                for key in input_obj.keys() {
-                    if !properties.contains_key(key) {
-                        errors.push(format!("Unknown property: '{}'", key));
-                    }
-                }
+        && let Some(properties) = schema.get("properties").and_then(|p| p.as_object())
+    {
+        for key in input_obj.keys() {
+            if !properties.contains_key(key) {
+                errors.push(format!("Unknown property: '{}'", key));
             }
+        }
+    }
 
     if errors.is_empty() {
         Ok(())
@@ -222,10 +222,7 @@ mod tests {
 
     #[test]
     fn test_validate_input_missing_required() {
-        let schema = object_schema(
-            vec![("name", json!({"type": "string"}))],
-            vec!["name"],
-        );
+        let schema = object_schema(vec![("name", json!({"type": "string"}))], vec!["name"]);
         let input = json!({});
         let err = validate_input(&input, &schema).unwrap_err();
         assert_eq!(err.len(), 1);
@@ -234,10 +231,7 @@ mod tests {
 
     #[test]
     fn test_validate_input_wrong_type() {
-        let schema = object_schema(
-            vec![("name", json!({"type": "string"}))],
-            vec!["name"],
-        );
+        let schema = object_schema(vec![("name", json!({"type": "string"}))], vec!["name"]);
         let input = json!({"name": 42});
         let err = validate_input(&input, &schema).unwrap_err();
         assert!(err[0].contains("expected type 'string'"));
@@ -246,10 +240,7 @@ mod tests {
     #[test]
     fn test_validate_input_enum() {
         let schema = object_schema(
-            vec![(
-                "mode",
-                json!({"type": "string", "enum": ["fast", "slow"]}),
-            )],
+            vec![("mode", json!({"type": "string", "enum": ["fast", "slow"]}))],
             vec!["mode"],
         );
         let valid = json!({"mode": "fast"});
@@ -262,10 +253,7 @@ mod tests {
 
     #[test]
     fn test_validate_additional_properties_false() {
-        let mut schema = object_schema(
-            vec![("name", json!({"type": "string"}))],
-            vec![],
-        );
+        let mut schema = object_schema(vec![("name", json!({"type": "string"}))], vec![]);
         schema["additionalProperties"] = json!(false);
 
         let input = json!({"name": "Alice", "extra": true});

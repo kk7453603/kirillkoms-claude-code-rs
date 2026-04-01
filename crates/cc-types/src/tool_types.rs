@@ -106,10 +106,12 @@ mod tests {
         let back: ToolSchema = serde_json::from_str(&json).unwrap();
         assert_eq!(back.name, "bash");
         assert_eq!(back.description, "Run a shell command");
-        assert!(back.input_schema["properties"]["command"]["type"]
-            .as_str()
-            .unwrap()
-            == "string");
+        assert!(
+            back.input_schema["properties"]["command"]["type"]
+                .as_str()
+                .unwrap()
+                == "string"
+        );
     }
 
     #[test]

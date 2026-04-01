@@ -2,7 +2,7 @@ use cc_tools::registry::ToolRegistry;
 use cc_tools::trait_def::{ToolError, ToolResult};
 
 use crate::tool_execution::{
-    execute_single_tool, execute_single_tool_with_context, ExecutionContext, PermissionCallback,
+    ExecutionContext, PermissionCallback, execute_single_tool, execute_single_tool_with_context,
 };
 
 /// A pending tool call from the model.
@@ -142,8 +142,14 @@ pub async fn run_tools_concurrently_with_context(
     for call in calls {
         let result = match tools.get(&call.name) {
             Some(t) => {
-                execute_single_tool_with_context(t, call.input, &call.id, exec_ctx, permission_callback)
-                    .await
+                execute_single_tool_with_context(
+                    t,
+                    call.input,
+                    &call.id,
+                    exec_ctx,
+                    permission_callback,
+                )
+                .await
             }
             None => ToolCallResult {
                 tool_use_id: call.id,
@@ -170,8 +176,14 @@ pub async fn run_tools_serially_with_context(
     for call in calls {
         let result = match tools.get(&call.name) {
             Some(t) => {
-                execute_single_tool_with_context(t, call.input, &call.id, exec_ctx, permission_callback)
-                    .await
+                execute_single_tool_with_context(
+                    t,
+                    call.input,
+                    &call.id,
+                    exec_ctx,
+                    permission_callback,
+                )
+                .await
             }
             None => ToolCallResult {
                 tool_use_id: call.id,
@@ -203,7 +215,8 @@ pub async fn execute_tool_calls_with_context(
 
     if !concurrent.is_empty() {
         let concurrent_results =
-            run_tools_concurrently_with_context(concurrent, tools, exec_ctx, permission_callback).await;
+            run_tools_concurrently_with_context(concurrent, tools, exec_ctx, permission_callback)
+                .await;
         results.extend(concurrent_results);
     }
 
