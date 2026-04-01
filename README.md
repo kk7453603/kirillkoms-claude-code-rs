@@ -518,9 +518,9 @@ export AZURE_AD_TOKEN=$(az account get-access-token --query accessToken -o tsv)
 
 | Переменная | Описание |
 |-----------|----------|
-| `CLAUDE_CODE_USE_BEDROCK` / `CLAUDE_USE_BEDROCK` | Включить AWS Bedrock |
-| `CLAUDE_CODE_USE_VERTEX` / `CLAUDE_USE_VERTEX` | Включить Google Vertex AI |
-| `CLAUDE_CODE_USE_FOUNDRY` / `CLAUDE_USE_FOUNDRY` | Включить Azure Foundry |
+| `CLAUDE_CODE_USE_BEDROCK` | Включить AWS Bedrock |
+| `CLAUDE_CODE_USE_VERTEX` | Включить Google Vertex AI |
+| `CLAUDE_CODE_USE_FOUNDRY` | Включить Azure Foundry |
 | `CLAUDE_CODE_USE_OPENAI` | Явно включить OpenAI-compatible |
 
 ### AWS Bedrock
@@ -538,7 +538,7 @@ export AZURE_AD_TOKEN=$(az account get-access-token --query accessToken -o tsv)
 
 | Переменная | По умолчанию | Описание |
 |-----------|-------------|----------|
-| `ANTHROPIC_VERTEX_PROJECT_ID` / `CLOUD_ML_PROJECT_ID` / `GOOGLE_CLOUD_PROJECT` | — | GCP Project ID |
+| `CLOUD_ML_PROJECT_ID` / `GOOGLE_CLOUD_PROJECT` | — | GCP Project ID |
 | `CLOUD_ML_REGION` | `us-central1` | Регион |
 | `GOOGLE_ACCESS_TOKEN` | — | OAuth2 access token (иначе используется ADC stub) |
 | `ANTHROPIC_VERTEX_BASE_URL` | — | Кастомный Vertex эндпоинт |
@@ -547,8 +547,8 @@ export AZURE_AD_TOKEN=$(az account get-access-token --query accessToken -o tsv)
 
 | Переменная | По умолчанию | Описание |
 |-----------|-------------|----------|
-| `ANTHROPIC_FOUNDRY_BASE_URL` / `AZURE_FOUNDRY_BASE_URL` | — | Base URL ресурса |
-| `ANTHROPIC_FOUNDRY_RESOURCE` / `AZURE_FOUNDRY_RESOURCE` | — | Имя деплоя |
+| `AZURE_FOUNDRY_BASE_URL` | — | Base URL ресурса (обязателен) |
+| `AZURE_FOUNDRY_RESOURCE` | `claude-deployment` | Имя деплоя |
 | `AZURE_AD_TOKEN` | — | Azure AD токен |
 
 ### OpenAI-совместимые
