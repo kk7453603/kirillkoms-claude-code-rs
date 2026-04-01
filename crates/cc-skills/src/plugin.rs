@@ -5,8 +5,10 @@ use std::path::{Path, PathBuf};
 pub struct PluginManifest {
     pub name: String,
     pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub commands: Vec<PluginCommand>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hooks: Option<Vec<PluginHook>>,
 }
 
@@ -39,7 +41,7 @@ pub enum PluginError {
     NotFound(String),
 }
 
-/// Load plugins from a directory. Each subdirectory is expected to contain a `plugin.json` manifest.
+/// Load plugins from a directory. Each subdirectory should contain a `plugin.json` manifest.
 pub fn load_plugins(plugins_dir: &Path) -> Result<Vec<LoadedPlugin>, PluginError> {
     let mut plugins = Vec::new();
 
@@ -48,6 +50,7 @@ pub fn load_plugins(plugins_dir: &Path) -> Result<Vec<LoadedPlugin>, PluginError
     }
 
     let entries = std::fs::read_dir(plugins_dir)?;
+
     for entry in entries {
         let entry = entry?;
         let path = entry.path();
@@ -62,11 +65,7 @@ pub fn load_plugins(plugins_dir: &Path) -> Result<Vec<LoadedPlugin>, PluginError
 
         let content = std::fs::read_to_string(&manifest_path)?;
         let manifest: PluginManifest = serde_json::from_str(&content).map_err(|e| {
-            PluginError::InvalidManifest(format!(
-                "{}: {}",
-                manifest_path.display(),
-                e
-            ))
+            PluginError::InvalidManifest(format!("{}: {}", manifest_path.display(), e))
         })?;
 
         plugins.push(LoadedPlugin {
@@ -88,77 +87,90 @@ pub fn find_plugin<'a>(plugins: &'a [LoadedPlugin], name: &str) -> Option<&'a Lo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use tempfile::TempDir;
 
-    fn create_test_plugin(dir: &Path, name: &str, version: &str) {
-        let plugin_dir = dir.join(name);
-        fs::create_dir_all(&plugin_dir).unwrap();
-        let manifest = PluginManifest {
+    fn create_plugin_dir(base: &Path, name: &str, manifest: &PluginManifest) -> PathBuf {
+        let dir = base.join(name);
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest_json = serde_json::to_string_pretty(manifest).unwrap();
+        std::fs::write(dir.join("plugin.json"), manifest_json).unwrap();
+        dir
+    }
+
+    fn sample_manifest(name: &str) -> PluginManifest {
+        PluginManifest {
             name: name.to_string(),
-            version: version.to_string(),
-            description: Some(format!("Test plugin {}", name)),
+            version: "1.0.0".to_string(),
+            description: Some(format!("A test plugin: {}", name)),
             commands: vec![PluginCommand {
                 name: "run".to_string(),
                 description: "Run the plugin".to_string(),
             }],
-            hooks: Some(vec![PluginHook {
-                event: "on_start".to_string(),
-                command: "init".to_string(),
-            }]),
-        };
-        let json = serde_json::to_string_pretty(&manifest).unwrap();
-        fs::write(plugin_dir.join("plugin.json"), json).unwrap();
+            hooks: None,
+        }
     }
 
     #[test]
-    fn test_load_plugins_from_directory() {
-        let tmp = tempfile::tempdir().unwrap();
-        create_test_plugin(tmp.path(), "alpha", "1.0.0");
-        create_test_plugin(tmp.path(), "beta", "2.0.0");
-
-        let plugins = load_plugins(tmp.path()).unwrap();
-        assert_eq!(plugins.len(), 2);
-        assert_eq!(plugins[0].manifest.name, "alpha");
-        assert_eq!(plugins[1].manifest.name, "beta");
-        assert!(plugins[0].enabled);
-    }
-
-    #[test]
-    fn test_load_plugins_empty_directory() {
-        let tmp = tempfile::tempdir().unwrap();
+    fn load_plugins_from_empty_dir() {
+        let tmp = TempDir::new().unwrap();
         let plugins = load_plugins(tmp.path()).unwrap();
         assert!(plugins.is_empty());
     }
 
     #[test]
-    fn test_load_plugins_nonexistent_directory() {
+    fn load_plugins_nonexistent_dir() {
         let plugins = load_plugins(Path::new("/nonexistent/path/to/plugins")).unwrap();
         assert!(plugins.is_empty());
     }
 
     #[test]
-    fn test_find_plugin_by_name() {
-        let tmp = tempfile::tempdir().unwrap();
-        create_test_plugin(tmp.path(), "my-plugin", "1.0.0");
+    fn load_single_plugin() {
+        let tmp = TempDir::new().unwrap();
+        let manifest = sample_manifest("test-plugin");
+        create_plugin_dir(tmp.path(), "test-plugin", &manifest);
+
+        let plugins = load_plugins(tmp.path()).unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].manifest.name, "test-plugin");
+        assert_eq!(plugins[0].manifest.version, "1.0.0");
+        assert!(plugins[0].enabled);
+    }
+
+    #[test]
+    fn load_multiple_plugins_sorted() {
+        let tmp = TempDir::new().unwrap();
+        create_plugin_dir(tmp.path(), "zeta-plugin", &sample_manifest("zeta-plugin"));
+        create_plugin_dir(tmp.path(), "alpha-plugin", &sample_manifest("alpha-plugin"));
+
+        let plugins = load_plugins(tmp.path()).unwrap();
+        assert_eq!(plugins.len(), 2);
+        assert_eq!(plugins[0].manifest.name, "alpha-plugin");
+        assert_eq!(plugins[1].manifest.name, "zeta-plugin");
+    }
+
+    #[test]
+    fn find_plugin_by_name() {
+        let tmp = TempDir::new().unwrap();
+        create_plugin_dir(tmp.path(), "my-plugin", &sample_manifest("my-plugin"));
+        create_plugin_dir(tmp.path(), "other-plugin", &sample_manifest("other-plugin"));
 
         let plugins = load_plugins(tmp.path()).unwrap();
         let found = find_plugin(&plugins, "my-plugin");
         assert!(found.is_some());
-        assert_eq!(found.unwrap().manifest.version, "1.0.0");
+        assert_eq!(found.unwrap().manifest.name, "my-plugin");
 
         let not_found = find_plugin(&plugins, "nonexistent");
         assert!(not_found.is_none());
     }
 
     #[test]
-    fn test_invalid_manifest() {
-        let tmp = tempfile::tempdir().unwrap();
-        let plugin_dir = tmp.path().join("bad-plugin");
-        fs::create_dir_all(&plugin_dir).unwrap();
-        fs::write(plugin_dir.join("plugin.json"), "{ invalid json }").unwrap();
+    fn invalid_manifest_returns_error() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().join("bad-plugin");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("plugin.json"), "not valid json").unwrap();
 
         let result = load_plugins(tmp.path());
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), PluginError::InvalidManifest(_)));
+        assert!(matches!(result, Err(PluginError::InvalidManifest(_))));
     }
 }

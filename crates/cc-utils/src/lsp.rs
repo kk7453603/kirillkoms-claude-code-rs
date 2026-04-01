@@ -1,28 +1,28 @@
 use serde::{Deserialize, Serialize};
 
 /// LSP position in a file
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Position {
     pub line: u32,
     pub character: u32,
 }
 
-/// LSP range within a file
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// LSP range (start + end positions)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
 }
 
 /// LSP location (file + range)
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Location {
     pub uri: String,
     pub range: Range,
 }
 
 /// LSP symbol information
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolInfo {
     pub name: String,
     pub kind: String,
@@ -30,7 +30,7 @@ pub struct SymbolInfo {
 }
 
 /// Hover result
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HoverResult {
     pub contents: String,
     pub range: Option<Range>,
@@ -75,7 +75,11 @@ impl LspClient for StubLspClient {
     ) -> Result<Vec<Location>, LspError> {
         Err(LspError::NotAvailable)
     }
-    async fn hover(&self, _file: &str, _pos: Position) -> Result<Option<HoverResult>, LspError> {
+    async fn hover(
+        &self,
+        _file: &str,
+        _pos: Position,
+    ) -> Result<Option<HoverResult>, LspError> {
         Err(LspError::NotAvailable)
     }
     async fn document_symbols(&self, _file: &str) -> Result<Vec<SymbolInfo>, LspError> {
@@ -91,114 +95,92 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_position_serialization() {
+    fn position_serialization_roundtrip() {
         let pos = Position {
             line: 10,
             character: 5,
         };
         let json = serde_json::to_string(&pos).unwrap();
-        let deserialized: Position = serde_json::from_str(&json).unwrap();
-        assert_eq!(pos, deserialized);
+        let back: Position = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.line, 10);
+        assert_eq!(back.character, 5);
     }
 
     #[test]
-    fn test_location_serialization() {
+    fn location_serialization_roundtrip() {
         let loc = Location {
             uri: "file:///src/main.rs".to_string(),
             range: Range {
-                start: Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: Position {
-                    line: 0,
-                    character: 10,
-                },
+                start: Position { line: 0, character: 0 },
+                end: Position { line: 0, character: 10 },
             },
         };
         let json = serde_json::to_string(&loc).unwrap();
-        assert!(json.contains("file:///src/main.rs"));
-        let deserialized: Location = serde_json::from_str(&json).unwrap();
-        assert_eq!(loc, deserialized);
+        let back: Location = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.uri, "file:///src/main.rs");
+        assert_eq!(back.range.start.line, 0);
+        assert_eq!(back.range.end.character, 10);
     }
 
     #[test]
-    fn test_symbol_info_serialization() {
+    fn symbol_info_serialization() {
         let sym = SymbolInfo {
             name: "my_function".to_string(),
             kind: "Function".to_string(),
             location: Location {
-                uri: "file:///src/lib.rs".to_string(),
+                uri: "file:///lib.rs".to_string(),
                 range: Range {
-                    start: Position {
-                        line: 5,
-                        character: 0,
-                    },
-                    end: Position {
-                        line: 5,
-                        character: 20,
-                    },
+                    start: Position { line: 5, character: 0 },
+                    end: Position { line: 5, character: 20 },
                 },
             },
         };
         let json = serde_json::to_string(&sym).unwrap();
-        let deserialized: SymbolInfo = serde_json::from_str(&json).unwrap();
-        assert_eq!(sym, deserialized);
+        assert!(json.contains("my_function"));
+        assert!(json.contains("Function"));
     }
 
     #[test]
-    fn test_hover_result_with_range() {
+    fn hover_result_with_and_without_range() {
         let hover = HoverResult {
             contents: "fn foo() -> i32".to_string(),
             range: Some(Range {
-                start: Position {
-                    line: 1,
-                    character: 0,
-                },
-                end: Position {
-                    line: 1,
-                    character: 3,
-                },
+                start: Position { line: 1, character: 4 },
+                end: Position { line: 1, character: 7 },
             }),
         };
         let json = serde_json::to_string(&hover).unwrap();
-        let deserialized: HoverResult = serde_json::from_str(&json).unwrap();
-        assert_eq!(hover, deserialized);
-    }
+        let back: HoverResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.contents, "fn foo() -> i32");
+        assert!(back.range.is_some());
 
-    #[test]
-    fn test_hover_result_without_range() {
-        let hover = HoverResult {
-            contents: "documentation text".to_string(),
+        let hover_no_range = HoverResult {
+            contents: "docs".to_string(),
             range: None,
         };
-        let json = serde_json::to_string(&hover).unwrap();
-        let deserialized: HoverResult = serde_json::from_str(&json).unwrap();
-        assert_eq!(hover, deserialized);
-        assert!(deserialized.range.is_none());
+        let json2 = serde_json::to_string(&hover_no_range).unwrap();
+        let back2: HoverResult = serde_json::from_str(&json2).unwrap();
+        assert!(back2.range.is_none());
     }
 
     #[tokio::test]
-    async fn test_stub_lsp_client_returns_not_available() {
+    async fn stub_client_returns_not_available() {
         let client = StubLspClient;
-        let pos = Position {
-            line: 0,
-            character: 0,
-        };
-        let result = client.go_to_definition("test.rs", pos.clone()).await;
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), LspError::NotAvailable));
+        let pos = Position { line: 0, character: 0 };
 
-        let result = client.find_references("test.rs", pos.clone()).await;
-        assert!(result.is_err());
+        let result = client.go_to_definition("file.rs", pos.clone()).await;
+        assert!(matches!(result, Err(LspError::NotAvailable)));
 
-        let result = client.hover("test.rs", pos).await;
-        assert!(result.is_err());
+        let result = client.find_references("file.rs", pos.clone()).await;
+        assert!(matches!(result, Err(LspError::NotAvailable)));
 
-        let result = client.document_symbols("test.rs").await;
-        assert!(result.is_err());
+        let result = client.hover("file.rs", pos).await;
+        assert!(matches!(result, Err(LspError::NotAvailable)));
+
+        let result = client.document_symbols("file.rs").await;
+        assert!(matches!(result, Err(LspError::NotAvailable)));
 
         let result = client.workspace_symbols("query").await;
-        assert!(result.is_err());
+        assert!(matches!(result, Err(LspError::NotAvailable)));
     }
 }

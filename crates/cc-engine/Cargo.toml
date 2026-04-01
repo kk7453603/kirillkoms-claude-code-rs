@@ -33,3 +33,4 @@ tokio = { workspace = true, features = ["test-util", "macros"] }
 wiremock = { workspace = true }
 insta = { workspace = true }
 mockall = { workspace = true }
+tempfile = { workspace = true }

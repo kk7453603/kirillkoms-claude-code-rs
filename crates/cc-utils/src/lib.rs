@@ -17,3 +17,4 @@ pub mod string;
 pub mod ansi;
 pub mod time;
 pub mod platform;
+pub mod lsp;

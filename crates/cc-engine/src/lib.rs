@@ -5,3 +5,4 @@ pub mod query_loop;
 pub mod streaming;
 pub mod token_budget;
 pub mod tool_execution;
+pub mod prompt_suggestion;
