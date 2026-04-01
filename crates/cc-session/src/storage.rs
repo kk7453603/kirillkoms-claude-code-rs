@@ -16,11 +16,10 @@ pub fn list_sessions(sessions_root: &Path) -> Result<Vec<String>, std::io::Error
     let entries = std::fs::read_dir(sessions_root)?;
     for entry in entries {
         let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            if let Some(name) = entry.file_name().to_str() {
+        if entry.file_type()?.is_dir()
+            && let Some(name) = entry.file_name().to_str() {
                 sessions.push(name.to_string());
             }
-        }
     }
     sessions.sort();
     Ok(sessions)

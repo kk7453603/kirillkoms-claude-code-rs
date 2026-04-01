@@ -1,6 +1,5 @@
 use cc_tools::registry::ToolRegistry;
 use cc_tools::trait_def::{ToolError, ToolResult};
-use std::sync::Arc;
 
 use crate::tool_execution::execute_single_tool;
 

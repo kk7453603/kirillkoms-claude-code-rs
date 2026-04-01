@@ -130,8 +130,8 @@ impl ApiClient for DirectApiClient {
                                     let line = buffer[..newline_pos].to_string();
                                     buffer = buffer[newline_pos + 1..].to_string();
 
-                                    if let Some(sse_event) = parse_sse_line(&line) {
-                                        if !sse_event.data.is_empty() && sse_event.data != "[DONE]" {
+                                    if let Some(sse_event) = parse_sse_line(&line)
+                                        && !sse_event.data.is_empty() && sse_event.data != "[DONE]" {
                                             match serde_json::from_str::<StreamEvent>(&sse_event.data) {
                                                 Ok(event) => yield Ok(event),
                                                 Err(e) => {
@@ -144,7 +144,6 @@ impl ApiClient for DirectApiClient {
                                                 }
                                             }
                                         }
-                                    }
                                 }
                             }
                             Some(Err(e)) => {

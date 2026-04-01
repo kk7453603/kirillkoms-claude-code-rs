@@ -139,7 +139,7 @@ fn first_command(cmd: &str) -> &str {
 fn is_read_only_command(lower_cmd: &str) -> bool {
     let cmd = first_command(lower_cmd);
 
-    if SAFE_COMMANDS.iter().any(|&s| cmd == s) {
+    if SAFE_COMMANDS.contains(&cmd) {
         return true;
     }
 

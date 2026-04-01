@@ -34,7 +34,6 @@ pub enum QueryEvent {
 }
 
 /// Parameters for a query.
-#[derive(Debug)]
 pub struct QueryParams {
     pub messages: Vec<ApiMessage>,
     pub system: Vec<SystemBlock>,

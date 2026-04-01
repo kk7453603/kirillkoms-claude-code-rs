@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 /// Represents the permission mode that controls how tool usage is authorized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum PermissionMode {
+    #[default]
     Default,
     Auto,
     Plan,
@@ -68,11 +70,6 @@ impl PermissionMode {
     }
 }
 
-impl Default for PermissionMode {
-    fn default() -> Self {
-        Self::Default
-    }
-}
 
 impl std::fmt::Display for PermissionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -41,17 +41,17 @@ mod tests {
     #[test]
     fn test_spinner_tick_cycles() {
         let mut spinner = Spinner::new("test");
-        let first = spinner.tick().to_string();
-        let second = spinner.tick().to_string();
+        let first = spinner.tick().to_string(); // frame 0, current -> 1
+        let second = spinner.tick().to_string(); // frame 1, current -> 2
         assert_ne!(first, second);
 
-        // Cycle through all frames and back to start
+        // Cycle through remaining 8 frames to return to start
         for _ in 0..8 {
             spinner.tick();
         }
-        let cycled = spinner.tick().to_string();
-        // After 10 more ticks from frame 0, should be back at frame 1
-        assert_eq!(cycled, second);
+        // current is back to 0
+        let cycled = spinner.tick().to_string(); // frame 0 again
+        assert_eq!(cycled, first);
     }
 
     #[test]

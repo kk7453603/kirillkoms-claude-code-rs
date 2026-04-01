@@ -109,8 +109,8 @@ impl Tool for FileWriteTool {
         let path = Path::new(file_path);
 
         // Create parent directories if needed
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = path.parent()
+            && !parent.exists() {
                 tokio::fs::create_dir_all(parent)
                     .await
                     .map_err(|e| ToolError::ExecutionFailed {
@@ -120,7 +120,6 @@ impl Tool for FileWriteTool {
                         ),
                     })?;
             }
-        }
 
         let is_new = !path.exists();
 

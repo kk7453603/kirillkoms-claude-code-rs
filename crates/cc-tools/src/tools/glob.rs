@@ -90,7 +90,7 @@ impl Tool for GlobTool {
         let base_path = input
             .get("path")
             .and_then(|v| v.as_str())
-            .map(|s| std::path::PathBuf::from(s))
+            .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
         let full_pattern = if pattern.starts_with('/') {

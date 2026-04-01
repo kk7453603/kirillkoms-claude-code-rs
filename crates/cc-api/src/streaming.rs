@@ -42,15 +42,10 @@ pub fn parse_sse_line(line: &str) -> Option<SseEvent> {
             event_type: Some(event_type.to_string()),
             data: String::new(),
         })
-    } else if let Some(event_type) = line.strip_prefix("event:") {
-        Some(SseEvent {
+    } else { line.strip_prefix("event:").map(|event_type| SseEvent {
             event_type: Some(event_type.to_string()),
             data: String::new(),
-        })
-    } else {
-        // Comment lines (starting with ':') or unknown fields
-        None
-    }
+        }) }
 }
 
 /// Accumulates streaming events into a complete response.
@@ -110,13 +105,11 @@ impl StreamAccumulator {
                         // Update ToolUse content block
                         if let Some(ContentBlock::ToolUse { input, .. }) =
                             self.content_blocks.get_mut(*index)
-                        {
-                            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(
+                            && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(
                                 &self.input_json_buffers[index],
                             ) {
                                 *input = parsed;
                             }
-                        }
                     }
                     ContentDelta::ThinkingDelta { thinking } => {
                         self.thinking_buffer.push_str(thinking);

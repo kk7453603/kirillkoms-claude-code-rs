@@ -5,7 +5,7 @@ pub fn format_duration(ms: u64) -> String {
         format!("{}ms", ms)
     } else if ms < 60_000 {
         let secs = ms as f64 / 1000.0;
-        if ms % 1000 == 0 {
+        if ms.is_multiple_of(1000) {
             format!("{}s", ms / 1000)
         } else {
             format!("{:.1}s", secs)
@@ -42,14 +42,14 @@ pub fn format_tokens(count: u64) -> String {
         format!("{}", count)
     } else if count < 1_000_000 {
         let k = count as f64 / 1000.0;
-        if count % 1000 == 0 {
+        if count.is_multiple_of(1000) {
             format!("{}K", count / 1000)
         } else {
             format!("{:.1}K", k)
         }
     } else {
         let m = count as f64 / 1_000_000.0;
-        if count % 1_000_000 == 0 {
+        if count.is_multiple_of(1_000_000) {
             format!("{}M", count / 1_000_000)
         } else {
             format!("{:.1}M", m)

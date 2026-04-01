@@ -42,11 +42,8 @@ pub fn normalize_path(path: &Path, cwd: &Path) -> PathBuf {
                 // Pop the last normal component, but never go above root
                 if !components.is_empty() {
                     let last = components.last().cloned();
-                    match last {
-                        Some(Component::Normal(_)) => {
-                            components.pop();
-                        }
-                        _ => {}
+                    if let Some(Component::Normal(_)) = last {
+                        components.pop();
                     }
                 }
             }

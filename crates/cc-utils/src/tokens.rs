@@ -6,7 +6,7 @@ pub fn estimate_tokens(text: &str) -> usize {
     // A rough heuristic: ~4 characters per token for English text.
     // This accounts for whitespace and common subword patterns.
     let char_count = text.len();
-    (char_count + 3) / 4 // ceiling division
+    char_count.div_ceil(4) // ceiling division
 }
 
 /// Estimate token count for a message.

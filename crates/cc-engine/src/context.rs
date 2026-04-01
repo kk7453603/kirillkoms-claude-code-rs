@@ -69,11 +69,10 @@ impl SystemContext {
                 parts.push(format!("Git branch: {}", branch));
             }
 
-            if let Some(status) = &self.git_status {
-                if !status.trim().is_empty() {
+            if let Some(status) = &self.git_status
+                && !status.trim().is_empty() {
                     parts.push(format!("Git status:\n{}", status));
                 }
-            }
 
             blocks.push(SystemBlock::Text {
                 text: parts.join("\n\n"),

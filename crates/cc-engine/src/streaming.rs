@@ -82,7 +82,7 @@ impl StreamState {
                     }
                     ContentDelta::SignatureDelta { signature } => {
                         if let Some(ContentBlock::Thinking {
-                            signature: ref mut existing,
+                            signature: existing,
                             ..
                         }) = self.content_blocks.get_mut(index)
                         {
@@ -114,7 +114,7 @@ impl StreamState {
 
                     // Update the content block with parsed input
                     if let Some(ContentBlock::ToolUse {
-                        input: ref mut existing_input,
+                        input: existing_input,
                         ..
                     }) = self.content_blocks.get_mut(index)
                     {

@@ -76,15 +76,14 @@ pub async fn list_worktrees(repo_root: &Path) -> Result<Vec<WorktreeInfo>, Workt
     for line in stdout.lines() {
         if let Some(path_str) = line.strip_prefix("worktree ") {
             // Save previous worktree if any
-            if let Some(path) = current_path.take() {
-                if !is_bare {
+            if let Some(path) = current_path.take()
+                && !is_bare {
                     worktrees.push(WorktreeInfo {
                         is_main: worktrees.is_empty(),
                         path,
                         branch: std::mem::take(&mut current_branch),
                     });
                 }
-            }
             current_path = Some(PathBuf::from(path_str));
             is_bare = false;
         } else if let Some(branch_ref) = line.strip_prefix("branch ") {
@@ -98,15 +97,14 @@ pub async fn list_worktrees(repo_root: &Path) -> Result<Vec<WorktreeInfo>, Workt
     }
 
     // Push the last one
-    if let Some(path) = current_path {
-        if !is_bare {
+    if let Some(path) = current_path
+        && !is_bare {
             worktrees.push(WorktreeInfo {
                 is_main: worktrees.is_empty(),
                 path,
                 branch: current_branch,
             });
         }
-    }
 
     Ok(worktrees)
 }

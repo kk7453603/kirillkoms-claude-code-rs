@@ -67,13 +67,11 @@ pub fn load_mcp_configs_from_dir(dir: &Path) -> Vec<McpServerConfig> {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("json") {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
+        if path.extension().and_then(|e| e.to_str()) == Some("json")
+            && let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) {
                     configs.extend(load_mcp_configs(&value));
                 }
-            }
-        }
     }
     configs
 }

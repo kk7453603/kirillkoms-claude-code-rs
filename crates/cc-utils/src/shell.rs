@@ -129,8 +129,7 @@ pub fn is_read_only_command(command: &str) -> bool {
             return true;
         }
         // Match "prefix " or "prefix\t" (command with arguments)
-        if trimmed.starts_with(prefix) {
-            let rest = &trimmed[prefix.len()..];
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
             if rest.starts_with(' ') || rest.starts_with('\t') {
                 return true;
             }

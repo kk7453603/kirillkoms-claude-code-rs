@@ -9,11 +9,10 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
 
     if let Some(required) = schema.get("required").and_then(|r| r.as_array()) {
         for req in required {
-            if let Some(field_name) = req.as_str() {
-                if input.get(field_name).is_none() {
+            if let Some(field_name) = req.as_str()
+                && input.get(field_name).is_none() {
                     errors.push(format!("Missing required field: '{}'", field_name));
                 }
-            }
         }
     }
 
@@ -42,8 +41,8 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
                 }
 
                 // Validate enum values
-                if let Some(enum_values) = prop_schema.get("enum").and_then(|e| e.as_array()) {
-                    if !enum_values.contains(value) {
+                if let Some(enum_values) = prop_schema.get("enum").and_then(|e| e.as_array())
+                    && !enum_values.contains(value) {
                         errors.push(format!(
                             "Field '{}' must be one of: {:?}",
                             prop_name,
@@ -53,7 +52,6 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
                                 .collect::<Vec<_>>()
                         ));
                     }
-                }
             }
         }
     }
@@ -63,17 +61,14 @@ pub fn validate_input(input: &Value, schema: &Value) -> Result<(), Vec<String>> 
         .get("additionalProperties")
         .and_then(|v| v.as_bool())
         == Some(false)
-    {
-        if let Some(input_obj) = input.as_object() {
-            if let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) {
+        && let Some(input_obj) = input.as_object()
+            && let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) {
                 for key in input_obj.keys() {
                     if !properties.contains_key(key) {
                         errors.push(format!("Unknown property: '{}'", key));
                     }
                 }
             }
-        }
-    }
 
     if errors.is_empty() {
         Ok(())
