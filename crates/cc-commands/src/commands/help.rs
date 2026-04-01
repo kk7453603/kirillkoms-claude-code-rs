@@ -7,8 +7,9 @@ pub static HELP: CommandDef = CommandDef {
     argument_hint: Some("[command]"),
     hidden: false,
     handler: |args| {
+        let args = args.trim().to_string();
         Box::pin(async move {
-            let args = args.trim();
+            let args = args.as_str();
             if !args.is_empty() {
                 let registry = crate::registry::CommandRegistry::with_defaults();
                 if let Some(cmd) = registry.lookup(args) {

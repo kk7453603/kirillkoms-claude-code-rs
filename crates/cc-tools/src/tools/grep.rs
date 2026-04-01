@@ -264,7 +264,10 @@ impl Tool for GrepTool {
 
         // If path is a file, search just that file
         if search_path.is_file() {
-            let results = search_file(&search_path, &re, output_mode, show_line_numbers, before_context, after_context)?;
+            let results = match search_file(&search_path, &re, output_mode, show_line_numbers, before_context, after_context) {
+                Ok(r) => r,
+                Err(()) => return Ok(ToolResult::text("")),
+            };
             let output = format_results(&results, output_mode, head_limit, offset);
             return Ok(ToolResult::text(&output));
         }

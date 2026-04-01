@@ -105,7 +105,7 @@ mod tests {
         assert!(reg.get("exit").is_some());
         assert!(reg.get("clear").is_some());
         assert!(reg.get("model").is_some());
-        assert!(reg.all_commands().len() >= 20);
+        assert!(reg.all_commands().len() >= 50);
     }
 
     #[test]
@@ -123,6 +123,6 @@ mod tests {
     #[test]
     fn test_all_commands_count() {
         let cmds = commands::all_commands();
-        assert_eq!(cmds.len(), 21);
+        assert_eq!(cmds.len(), 50);
     }
 }
