@@ -41,6 +41,7 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 | `/autofix-pr` | Automatically fix issues in a pull request |
 | `/security-review` | Complete a security review of pending changes on the current branch |
 | `/release-notes` | Generate release notes from git history |
+| `/issue` | Create or view GitHub issues |
 
 ---
 
@@ -181,6 +182,7 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 
 | Команда | Описание |
 |---------|----------|
+| `/bridge-kick` | Inject bridge failure states for testing (internal) |
 | `/ant-trace` | Show internal trace information (Anthropic-only) |
 | `/backfill-sessions` | Backfill session data (internal) |
 | `/break-cache` | Invalidate prompt cache (internal) |
