@@ -145,13 +145,13 @@ export AWS_REGION=us-east-1
 
 # Google Vertex AI
 export CLAUDE_CODE_USE_VERTEX=1
-export ANTHROPIC_VERTEX_PROJECT_ID=my-project
+export CLOUD_ML_PROJECT_ID=my-project
 export CLOUD_ML_REGION=us-east5
 
 # Azure Foundry
 export CLAUDE_CODE_USE_FOUNDRY=1
-export ANTHROPIC_FOUNDRY_BASE_URL=https://...
-export ANTHROPIC_FOUNDRY_RESOURCE=my-resource
+export AZURE_FOUNDRY_BASE_URL=https://...
+export AZURE_FOUNDRY_RESOURCE=my-resource
 
 # OpenAI-compatible (OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together AI)
 export OPENAI_API_KEY=sk-...
@@ -437,7 +437,7 @@ export AWS_SESSION_TOKEN=...    # для временных учётных да�
 
 ```bash
 export CLAUDE_CODE_USE_VERTEX=1
-export ANTHROPIC_VERTEX_PROJECT_ID=my-gcp-project
+export CLOUD_ML_PROJECT_ID=my-gcp-project
 export CLOUD_ML_REGION=us-east5   # регион с поддержкой Claude
 
 # Аутентификация через gcloud (рекомендуется)
@@ -473,8 +473,8 @@ export GOOGLE_ACCESS_TOKEN=$(gcloud auth print-access-token)
 
 ```bash
 export CLAUDE_CODE_USE_FOUNDRY=1
-export ANTHROPIC_FOUNDRY_BASE_URL=https://my-resource.openai.azure.com
-export ANTHROPIC_FOUNDRY_RESOURCE=my-claude-deployment
+export AZURE_FOUNDRY_BASE_URL=https://my-resource.openai.azure.com
+export AZURE_FOUNDRY_RESOURCE=my-claude-deployment
 
 # Аутентификация через Azure AD (рекомендуется)
 export AZURE_AD_TOKEN=$(az account get-access-token --query accessToken -o tsv)
