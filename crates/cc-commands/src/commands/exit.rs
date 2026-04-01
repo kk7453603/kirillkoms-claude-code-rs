@@ -8,3 +8,15 @@ pub static EXIT: CommandDef = CommandDef {
     hidden: false,
     handler: |_args| Box::pin(async { Ok(CommandOutput::exit()) }),
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_exit() {
+        let result = (EXIT.handler)("").await.unwrap();
+        assert!(!result.should_continue);
+        assert!(result.message.is_none());
+    }
+}
