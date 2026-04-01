@@ -25,7 +25,7 @@ Claude Code RS is a complete Rust rewrite of the Claude Code CLI agent. It provi
 
 - **Multi-turn conversations** with Claude (Opus, Sonnet, Haiku) and any OpenAI-compatible model
 - **31 tools**: Bash, File Read/Write/Edit, Grep, Glob, Web Search (SearXNG), Web Fetch, LSP, MCP, Agent spawning, Tasks, Skills, Notebooks, and more
-- **99 slash commands**: `/help`, `/commit`, `/diff`, `/doctor`, `/model`, `/status`, `/init`, `/branch`, `/tasks`, `/export`, etc.
+- **99 slash commands**: `/help`, `/commit`, `/diff`, `/doctor`, `/model`, `/status`, `/init`, `/branch`, `/tasks`, `/export`, etc. — [see full reference](docs/commands.md)
 - **5 API providers**: Anthropic Direct, AWS Bedrock, Google Vertex AI, Azure Foundry, OpenAI-compatible (OpenAI, OpenRouter, Ollama, LM Studio, vLLM, Together AI, etc.)
 - **Tool-fallback retry**: Models without native function calling (e.g. dolphin-llama3) automatically fall back to text-based tool descriptions; result cached per session
 - **Thinking model support**: Ollama Qwen3/Qwen3.5 `reasoning` field used as fallback when `content` is empty
