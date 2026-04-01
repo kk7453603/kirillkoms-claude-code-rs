@@ -8,14 +8,14 @@ use crate::errors::ApiError;
 use crate::streaming::parse_sse_line;
 use crate::types::{MessagesRequest, MessagesResponse, StreamEvent};
 
-pub struct BedrockApiClient {
+pub struct FoundryApiClient {
     http: reqwest::Client,
-    region: String,
-    model_id: String,
+    base_url: String,
+    resource: String,
 }
 
-impl BedrockApiClient {
-    pub fn new(region: String, model_id: String) -> Result<Self, ApiError> {
+impl FoundryApiClient {
+    pub fn new(base_url: String, resource: String) -> Result<Self, ApiError> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             "content-type",
@@ -36,46 +36,27 @@ impl BedrockApiClient {
 
         Ok(Self {
             http,
-            region,
-            model_id,
+            base_url,
+            resource,
         })
     }
 
     fn endpoint_url(&self) -> String {
         format!(
-            "https://bedrock-runtime.{}.amazonaws.com/model/{}/invoke-with-response-stream",
-            self.region, self.model_id
+            "{}/openai/deployments/{}/messages",
+            self.base_url, self.resource
         )
     }
 
-    /// Stub for AWS Signature V4 signing. In a real implementation this would
-    /// compute HMAC-SHA256 based signatures over the request headers and body.
-    /// Returns a set of headers that would normally contain Authorization,
-    /// X-Amz-Date, and optionally X-Amz-Security-Token.
-    fn sign_request_v4(
-        &self,
-        _method: &str,
-        _url: &str,
-        _body: &str,
-    ) -> Vec<(String, String)> {
-        let now = chrono::Utc::now();
-        let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
-        let date_stamp = now.format("%Y%m%d").to_string();
-
-        // Stub: in production, these would be real computed values
-        let credential = format!(
-            "AKIAIOSFODNN7EXAMPLE/{}/{}/bedrock/aws4_request",
-            date_stamp, self.region
-        );
-        let authorization = format!(
-            "AWS4-HMAC-SHA256 Credential={}, SignedHeaders=content-type;host;x-amz-date, Signature=stub_signature",
-            credential
-        );
-
-        vec![
-            ("X-Amz-Date".to_string(), amz_date),
-            ("Authorization".to_string(), authorization),
-        ]
+    /// Stub for Azure AD token retrieval.
+    /// In production, this would use the Azure Identity SDK to obtain
+    /// a token via managed identity, service principal, or CLI credentials.
+    fn get_azure_ad_token(&self) -> Result<String, ApiError> {
+        if let Ok(token) = std::env::var("AZURE_AD_TOKEN") {
+            return Ok(token);
+        }
+        // Stub: return a placeholder token
+        Ok("eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.stub-azure-ad-token".to_string())
     }
 
     fn build_request(
@@ -83,23 +64,24 @@ impl BedrockApiClient {
         request: &MessagesRequest,
     ) -> Result<reqwest::RequestBuilder, ApiError> {
         let url = self.endpoint_url();
+        let token = self.get_azure_ad_token()?;
         let body = serde_json::to_string(request).map_err(|e| ApiError::InvalidRequest {
             message: format!("Failed to serialize request: {}", e),
         })?;
 
-        let sign_headers = self.sign_request_v4("POST", &url, &body);
-
-        let mut builder = self.http.post(&url).body(body);
-        for (name, value) in sign_headers {
-            builder = builder.header(&name, &value);
-        }
+        let builder = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .header("api-version", "2024-06-01")
+            .body(body);
 
         Ok(builder)
     }
 }
 
 #[async_trait]
-impl ApiClient for BedrockApiClient {
+impl ApiClient for FoundryApiClient {
     async fn stream_messages(
         &self,
         mut request: MessagesRequest,
@@ -222,55 +204,51 @@ impl ApiClient for BedrockApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::*;
 
     #[test]
-    fn create_bedrock_client() {
-        let client = BedrockApiClient::new(
-            "us-east-1".to_string(),
-            "anthropic.claude-3-sonnet-20240229-v1:0".to_string(),
+    fn create_foundry_client() {
+        let client = FoundryApiClient::new(
+            "https://my-resource.openai.azure.com".to_string(),
+            "claude-deployment".to_string(),
         );
         assert!(client.is_ok());
         let client = client.unwrap();
-        assert_eq!(client.region, "us-east-1");
-        assert_eq!(
-            client.model_id,
-            "anthropic.claude-3-sonnet-20240229-v1:0"
-        );
+        assert_eq!(client.base_url, "https://my-resource.openai.azure.com");
+        assert_eq!(client.resource, "claude-deployment");
     }
 
     #[test]
     fn endpoint_url_format() {
-        let client = BedrockApiClient::new(
-            "us-west-2".to_string(),
-            "anthropic.claude-3-haiku-20240307-v1:0".to_string(),
+        let client = FoundryApiClient::new(
+            "https://my-resource.openai.azure.com".to_string(),
+            "claude-3-sonnet".to_string(),
         )
         .unwrap();
         let url = client.endpoint_url();
         assert_eq!(
             url,
-            "https://bedrock-runtime.us-west-2.amazonaws.com/model/anthropic.claude-3-haiku-20240307-v1:0/invoke-with-response-stream"
+            "https://my-resource.openai.azure.com/openai/deployments/claude-3-sonnet/messages"
         );
     }
 
     #[test]
-    fn sign_request_v4_returns_headers() {
-        let client = BedrockApiClient::new(
-            "us-east-1".to_string(),
-            "anthropic.claude-3-sonnet-20240229-v1:0".to_string(),
+    fn get_azure_ad_token_returns_stub() {
+        let client = FoundryApiClient::new(
+            "https://example.azure.com".to_string(),
+            "deployment".to_string(),
         )
         .unwrap();
-        let headers = client.sign_request_v4("POST", "https://example.com", "{}");
-        assert_eq!(headers.len(), 2);
-        assert_eq!(headers[0].0, "X-Amz-Date");
-        assert_eq!(headers[1].0, "Authorization");
-        assert!(headers[1].1.starts_with("AWS4-HMAC-SHA256"));
+        let token = client.get_azure_ad_token();
+        assert!(token.is_ok());
+        assert!(!token.unwrap().is_empty());
     }
 
     #[test]
     fn build_request_serializes() {
-        let client = BedrockApiClient::new(
-            "eu-west-1".to_string(),
-            "anthropic.claude-3-sonnet-20240229-v1:0".to_string(),
+        let client = FoundryApiClient::new(
+            "https://example.azure.com".to_string(),
+            "deployment".to_string(),
         )
         .unwrap();
         let request = MessagesRequest {
@@ -291,10 +269,9 @@ mod tests {
 
     #[tokio::test]
     async fn send_messages_connection_error() {
-        // BedrockApiClient will fail to connect to the real endpoint without valid AWS creds
-        let client = BedrockApiClient::new(
-            "us-east-1".to_string(),
-            "anthropic.claude-3-sonnet-20240229-v1:0".to_string(),
+        let client = FoundryApiClient::new(
+            "http://localhost:1".to_string(),
+            "deployment".to_string(),
         )
         .unwrap();
         let request = MessagesRequest {

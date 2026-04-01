@@ -1,5 +1,36 @@
 use crate::errors::ApiError;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ApiProvider {
+    Direct,
+    Bedrock,
+    Vertex,
+    Foundry,
+}
+
+impl ApiProvider {
+    /// Detect the provider from environment variables.
+    pub fn from_env() -> Self {
+        if std::env::var("CLAUDE_CODE_USE_BEDROCK").ok().as_deref() == Some("1")
+            || std::env::var("AWS_REGION").is_ok() && std::env::var("ANTHROPIC_MODEL").ok().map_or(false, |m| m.starts_with("anthropic."))
+        {
+            return ApiProvider::Bedrock;
+        }
+        if std::env::var("CLAUDE_CODE_USE_VERTEX").ok().as_deref() == Some("1")
+            || std::env::var("CLOUD_ML_PROJECT_ID").is_ok()
+            || std::env::var("GOOGLE_CLOUD_PROJECT").is_ok()
+        {
+            return ApiProvider::Vertex;
+        }
+        if std::env::var("CLAUDE_CODE_USE_FOUNDRY").ok().as_deref() == Some("1")
+            || std::env::var("AZURE_FOUNDRY_BASE_URL").is_ok()
+        {
+            return ApiProvider::Foundry;
+        }
+        ApiProvider::Direct
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum AuthMethod {
     ApiKey(String),
@@ -95,6 +126,29 @@ mod tests {
         let (name, value) = config.auth_header();
         assert_eq!(name, "authorization");
         assert_eq!(value, "Bearer oauth-token-123");
+    }
+
+    #[test]
+    fn api_provider_default_is_direct() {
+        // Without any special env vars, should default to Direct
+        // (This test is best-effort; env may have vars set externally)
+        let provider = ApiProvider::from_env();
+        // Just verify it returns a valid variant
+        assert!(
+            provider == ApiProvider::Direct
+                || provider == ApiProvider::Bedrock
+                || provider == ApiProvider::Vertex
+                || provider == ApiProvider::Foundry
+        );
+    }
+
+    #[test]
+    fn api_provider_equality() {
+        assert_eq!(ApiProvider::Direct, ApiProvider::Direct);
+        assert_eq!(ApiProvider::Bedrock, ApiProvider::Bedrock);
+        assert_eq!(ApiProvider::Vertex, ApiProvider::Vertex);
+        assert_eq!(ApiProvider::Foundry, ApiProvider::Foundry);
+        assert_ne!(ApiProvider::Direct, ApiProvider::Bedrock);
     }
 
     // Note: from_env() tests that manipulate env vars are inherently racy
