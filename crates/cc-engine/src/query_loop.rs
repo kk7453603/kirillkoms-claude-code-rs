@@ -5,7 +5,8 @@ use tokio_stream::Stream;
 use cc_api::types::{ApiMessage, ContentBlock, MessagesRequest, Role, SystemBlock, ThinkingConfig, ToolDefinition};
 use cc_tools::registry::ToolRegistry;
 
-use crate::orchestration::{execute_tool_calls, PendingToolCall};
+use crate::orchestration::{execute_tool_calls, execute_tool_calls_with_context, PendingToolCall};
+use crate::tool_execution::{ExecutionContext, PermissionCallback};
 
 /// Events yielded by the query loop.
 #[derive(Debug, Clone)]
@@ -43,6 +44,8 @@ pub struct QueryParams {
     pub api_client: Arc<dyn cc_api::client::ApiClient>,
     pub max_turns: usize,
     pub thinking: Option<ThinkingConfig>,
+    pub execution_context: Option<ExecutionContext>,
+    pub permission_callback: Option<Arc<dyn PermissionCallback>>,
 }
 
 /// Run the main query loop.
@@ -126,7 +129,19 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
             }
 
             // 6. Execute tool calls
-            let results = execute_tool_calls(tool_calls, &params.tools).await;
+            let results = if let (Some(exec_ctx), Some(perm_cb)) =
+                (&params.execution_context, &params.permission_callback)
+            {
+                execute_tool_calls_with_context(
+                    tool_calls,
+                    &params.tools,
+                    exec_ctx,
+                    perm_cb.as_ref(),
+                )
+                .await
+            } else {
+                execute_tool_calls(tool_calls, &params.tools).await
+            };
 
             // 7. Build assistant message
             let assistant_msg = ApiMessage {
@@ -293,6 +308,8 @@ mod tests {
             api_client,
             max_turns: 0,
             thinking: None,
+            execution_context: None,
+            permission_callback: None,
         };
 
         let mut stream = std::pin::pin!(query(params));
@@ -341,6 +358,8 @@ mod tests {
             api_client,
             max_turns: 5,
             thinking: None,
+            execution_context: None,
+            permission_callback: None,
         };
 
         let mut stream = std::pin::pin!(query(params));
@@ -384,6 +403,8 @@ mod tests {
             api_client,
             max_turns: 5,
             thinking: None,
+            execution_context: None,
+            permission_callback: None,
         };
 
         let mut stream = std::pin::pin!(query(params));

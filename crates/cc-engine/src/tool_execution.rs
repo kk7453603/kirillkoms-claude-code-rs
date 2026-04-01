@@ -1,6 +1,11 @@
 use cc_api::types::ContentBlock;
+use cc_hooks::dispatch::dispatch_hooks;
+use cc_hooks::events;
+use cc_hooks::types::{HookEventType, HookOutcome, HooksConfig};
+use cc_permissions::checker::{PermissionContext, PermissionDecision};
 use cc_tools::trait_def::{Tool, ToolError, ToolResult};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::orchestration::ToolCallResult;
@@ -23,6 +28,183 @@ pub async fn execute_single_tool(
         result,
         duration_ms,
     }
+}
+
+/// Callback for interactive permission prompts.
+#[async_trait::async_trait]
+pub trait PermissionCallback: Send + Sync {
+    async fn ask_permission(
+        &self,
+        tool_name: &str,
+        message: &str,
+        input: &serde_json::Value,
+    ) -> bool;
+}
+
+/// Default: always approve (for non-interactive mode).
+pub struct AutoApproveCallback;
+
+#[async_trait::async_trait]
+impl PermissionCallback for AutoApproveCallback {
+    async fn ask_permission(
+        &self,
+        _tool_name: &str,
+        _message: &str,
+        _input: &serde_json::Value,
+    ) -> bool {
+        true
+    }
+}
+
+/// Interactive: prompt user on stderr.
+pub struct InteractivePermissionCallback;
+
+#[async_trait::async_trait]
+impl PermissionCallback for InteractivePermissionCallback {
+    async fn ask_permission(
+        &self,
+        tool_name: &str,
+        message: &str,
+        input: &serde_json::Value,
+    ) -> bool {
+        eprintln!("\n\u{26a0} Permission required for tool: {}", tool_name);
+        eprintln!("  {}", message);
+        if let Some(cmd) = input.get("command").and_then(|v| v.as_str()) {
+            eprintln!("  Command: {}", cmd);
+        }
+        if let Some(path) = input.get("file_path").and_then(|v| v.as_str()) {
+            eprintln!("  File: {}", path);
+        }
+        eprint!("  Allow? [y/N]: ");
+
+        let mut response = String::new();
+        std::io::stdin().read_line(&mut response).unwrap_or(0);
+        let response = response.trim().to_lowercase();
+        matches!(response.as_str(), "y" | "yes")
+    }
+}
+
+/// Context passed through the execution pipeline for permissions, hooks, and session.
+#[derive(Clone)]
+pub struct ExecutionContext {
+    pub permission_ctx: PermissionContext,
+    pub hooks_config: HooksConfig,
+    pub session_id: Option<String>,
+    pub cwd: PathBuf,
+}
+
+impl ExecutionContext {
+    pub fn new(permission_ctx: PermissionContext, cwd: PathBuf) -> Self {
+        Self {
+            permission_ctx,
+            hooks_config: HooksConfig::new(),
+            session_id: None,
+            cwd,
+        }
+    }
+}
+
+/// Execute a single tool call with permission checking and hook dispatch.
+pub async fn execute_single_tool_with_context(
+    tool: Arc<dyn Tool>,
+    input: Value,
+    tool_use_id: &str,
+    exec_ctx: &ExecutionContext,
+    permission_callback: &dyn PermissionCallback,
+) -> ToolCallResult {
+    let tool_name = tool.name().to_string();
+
+    // 1. Run PreToolUse hooks
+    let pre_input = events::pre_tool_use_input(
+        &tool_name,
+        &input,
+        exec_ctx.session_id.as_deref(),
+    );
+    let pre_result = dispatch_hooks(
+        &exec_ctx.hooks_config,
+        HookEventType::PreToolUse,
+        &pre_input,
+        &exec_ctx.cwd,
+    )
+    .await;
+
+    let final_input = match pre_result {
+        HookOutcome::Blocked { reason } => {
+            return ToolCallResult {
+                tool_use_id: tool_use_id.to_string(),
+                tool_name,
+                result: Ok(ToolResult::error(&format!(
+                    "Blocked by hook: {}",
+                    reason
+                ))),
+                duration_ms: 0,
+            };
+        }
+        HookOutcome::Approved { updated_input, .. } => updated_input.unwrap_or(input),
+        _ => input,
+    };
+
+    // 2. Check permissions
+    let is_read_only = tool.is_read_only(&final_input);
+    let is_destructive = tool.is_destructive(&final_input);
+    let decision = exec_ctx.permission_ctx.check_permission(
+        &tool_name,
+        &final_input,
+        is_read_only,
+        is_destructive,
+    );
+
+    match decision {
+        PermissionDecision::Allow { .. } => {}
+        PermissionDecision::Deny { reason } => {
+            return ToolCallResult {
+                tool_use_id: tool_use_id.to_string(),
+                tool_name,
+                result: Ok(ToolResult::error(&format!(
+                    "Permission denied: {}",
+                    reason
+                ))),
+                duration_ms: 0,
+            };
+        }
+        PermissionDecision::Ask { message, .. } => {
+            let approved = permission_callback
+                .ask_permission(&tool_name, &message, &final_input)
+                .await;
+            if !approved {
+                return ToolCallResult {
+                    tool_use_id: tool_use_id.to_string(),
+                    tool_name,
+                    result: Ok(ToolResult::error("User denied permission")),
+                    duration_ms: 0,
+                };
+            }
+        }
+    }
+
+    // 3. Execute tool
+    let result = execute_single_tool(tool.clone(), final_input.clone(), tool_use_id).await;
+
+    // 4. Run PostToolUse hooks
+    let output_value = match &result.result {
+        Ok(tr) => tr.content.clone(),
+        Err(e) => serde_json::Value::String(e.to_string()),
+    };
+    let post_input = events::post_tool_use_input(
+        &tool_name,
+        &final_input,
+        &output_value,
+        exec_ctx.session_id.as_deref(),
+    );
+    let _ = dispatch_hooks(
+        &exec_ctx.hooks_config,
+        HookEventType::PostToolUse,
+        &post_input,
+        &exec_ctx.cwd,
+    )
+    .await;
+
+    result
 }
 
 /// Convert tool results to API content blocks.

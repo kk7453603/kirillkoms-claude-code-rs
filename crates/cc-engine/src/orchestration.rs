@@ -1,7 +1,9 @@
 use cc_tools::registry::ToolRegistry;
 use cc_tools::trait_def::{ToolError, ToolResult};
 
-use crate::tool_execution::execute_single_tool;
+use crate::tool_execution::{
+    execute_single_tool, execute_single_tool_with_context, ExecutionContext, PermissionCallback,
+};
 
 /// A pending tool call from the model.
 #[derive(Debug, Clone)]
@@ -120,6 +122,94 @@ pub async fn execute_tool_calls(
 
     if !serial.is_empty() {
         let serial_results = run_tools_serially(serial, tools).await;
+        results.extend(serial_results);
+    }
+
+    results
+}
+
+/// Execute tool calls concurrently with permission checking and hooks.
+pub async fn run_tools_concurrently_with_context(
+    calls: Vec<PendingToolCall>,
+    tools: &ToolRegistry,
+    exec_ctx: &ExecutionContext,
+    permission_callback: &dyn PermissionCallback,
+) -> Vec<ToolCallResult> {
+    // Note: for concurrent execution, we run them serially through
+    // permission/hook checks but the actual tool calls could be parallel.
+    // Since permission callbacks may require user interaction, we run serially.
+    let mut results = Vec::with_capacity(calls.len());
+    for call in calls {
+        let result = match tools.get(&call.name) {
+            Some(t) => {
+                execute_single_tool_with_context(t, call.input, &call.id, exec_ctx, permission_callback)
+                    .await
+            }
+            None => ToolCallResult {
+                tool_use_id: call.id,
+                tool_name: call.name,
+                result: Err(ToolError::ExecutionFailed {
+                    message: "Tool not found".to_string(),
+                }),
+                duration_ms: 0,
+            },
+        };
+        results.push(result);
+    }
+    results
+}
+
+/// Execute tool calls serially with permission checking and hooks.
+pub async fn run_tools_serially_with_context(
+    calls: Vec<PendingToolCall>,
+    tools: &ToolRegistry,
+    exec_ctx: &ExecutionContext,
+    permission_callback: &dyn PermissionCallback,
+) -> Vec<ToolCallResult> {
+    let mut results = Vec::with_capacity(calls.len());
+    for call in calls {
+        let result = match tools.get(&call.name) {
+            Some(t) => {
+                execute_single_tool_with_context(t, call.input, &call.id, exec_ctx, permission_callback)
+                    .await
+            }
+            None => ToolCallResult {
+                tool_use_id: call.id,
+                tool_name: call.name,
+                result: Err(ToolError::ExecutionFailed {
+                    message: "Tool not found".to_string(),
+                }),
+                duration_ms: 0,
+            },
+        };
+        results.push(result);
+    }
+    results
+}
+
+/// Execute all tool calls with permission checking and hook dispatch.
+///
+/// Same partitioning as `execute_tool_calls` but routes through
+/// permission checks and pre/post hooks.
+pub async fn execute_tool_calls_with_context(
+    calls: Vec<PendingToolCall>,
+    tools: &ToolRegistry,
+    exec_ctx: &ExecutionContext,
+    permission_callback: &dyn PermissionCallback,
+) -> Vec<ToolCallResult> {
+    let (concurrent, serial) = partition_tool_calls(&calls, tools);
+
+    let mut results = Vec::with_capacity(calls.len());
+
+    if !concurrent.is_empty() {
+        let concurrent_results =
+            run_tools_concurrently_with_context(concurrent, tools, exec_ctx, permission_callback).await;
+        results.extend(concurrent_results);
+    }
+
+    if !serial.is_empty() {
+        let serial_results =
+            run_tools_serially_with_context(serial, tools, exec_ctx, permission_callback).await;
         results.extend(serial_results);
     }
 
