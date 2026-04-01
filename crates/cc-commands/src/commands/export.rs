@@ -9,6 +9,14 @@ pub static EXPORT: CommandDef = CommandDef {
     handler: |args| {
         let args = args.trim().to_string();
         Box::pin(async move {
+            if args.is_empty() {
+                return Ok(CommandOutput::message(
+                    "Usage: /export [format] [path]\n\n\
+                     Formats: markdown (default), json, text\n\
+                     Example: /export markdown session.md",
+                ));
+            }
+
             let parts: Vec<&str> = args.split_whitespace().collect();
             let format = parts.first().copied().unwrap_or("markdown");
             let output_path = parts.get(1).copied();
@@ -37,11 +45,6 @@ pub static EXPORT: CommandDef = CommandDef {
                         path
                     )))
                 }
-                "" => Ok(CommandOutput::message(
-                    "Usage: /export [format] [path]\n\n\
-                     Formats: markdown (default), json, text\n\
-                     Example: /export markdown session.md",
-                )),
                 other => Ok(CommandOutput::message(&format!(
                     "Unknown format: '{}'\nAvailable: markdown, json, text",
                     other
