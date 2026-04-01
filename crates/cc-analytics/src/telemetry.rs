@@ -47,7 +47,6 @@ mod tests {
     #[test]
     fn test_telemetry_function_returns_bool() {
         let result = is_telemetry_enabled();
-        // Result should be a valid bool (type system guarantees this, but verify no panic)
-        assert!(result || !result);
+        let _ = result; // just verify it doesn't panic
     }
 }
