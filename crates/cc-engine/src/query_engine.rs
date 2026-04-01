@@ -248,6 +248,59 @@ mod tests {
     use super::*;
 
     // Reuse mock from query_loop tests
+    /// Helper to convert a non-streaming response into a sequence of StreamEvents.
+    fn response_to_stream_events(
+        response: cc_api::types::MessagesResponse,
+    ) -> Vec<cc_api::types::StreamEvent> {
+        use cc_api::types::*;
+        let mut events = Vec::new();
+
+        events.push(StreamEvent::MessageStart {
+            message: MessagesResponse {
+                id: response.id.clone(),
+                model: response.model.clone(),
+                role: response.role,
+                content: vec![],
+                stop_reason: None,
+                usage: response.usage.clone(),
+            },
+        });
+
+        for (i, block) in response.content.iter().enumerate() {
+            events.push(StreamEvent::ContentBlockStart {
+                index: i,
+                content_block: match block {
+                    ContentBlock::Text { .. } => ContentBlock::Text {
+                        text: String::new(),
+                    },
+                    other => other.clone(),
+                },
+            });
+            match block {
+                ContentBlock::Text { text } => {
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index: i,
+                        delta: cc_api::types::ContentDelta::TextDelta {
+                            text: text.clone(),
+                        },
+                    });
+                }
+                _ => {}
+            }
+            events.push(StreamEvent::ContentBlockStop { index: i });
+        }
+
+        events.push(StreamEvent::MessageDelta {
+            delta: cc_api::types::MessageDeltaBody {
+                stop_reason: response.stop_reason.clone(),
+            },
+            usage: Some(response.usage.clone()),
+        });
+
+        events.push(StreamEvent::MessageStop);
+        events
+    }
+
     struct MockApiClient {
         responses: std::sync::Mutex<
             Vec<Result<cc_api::types::MessagesResponse, cc_api::errors::ApiError>>,
@@ -290,9 +343,18 @@ mod tests {
             >,
             cc_api::errors::ApiError,
         > {
-            Err(cc_api::errors::ApiError::InvalidRequest {
-                message: "not implemented".to_string(),
-            })
+            let mut responses = self.responses.lock().unwrap();
+            match responses.pop() {
+                Some(Ok(response)) => {
+                    let events = response_to_stream_events(response);
+                    let stream = futures::stream::iter(events.into_iter().map(Ok));
+                    Ok(Box::pin(stream))
+                }
+                Some(Err(e)) => Err(e),
+                None => Err(cc_api::errors::ApiError::InvalidRequest {
+                    message: "no more mock responses".to_string(),
+                }),
+            }
         }
 
         async fn send_messages(

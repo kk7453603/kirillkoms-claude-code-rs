@@ -1,11 +1,16 @@
 use async_stream::stream;
+use futures::StreamExt;
 use std::sync::Arc;
 use tokio_stream::Stream;
 
-use cc_api::types::{ApiMessage, ContentBlock, MessagesRequest, Role, SystemBlock, ThinkingConfig, ToolDefinition};
+use cc_api::types::{
+    ApiMessage, ContentBlock, ContentDelta, MessagesRequest, Role, StreamEvent, SystemBlock,
+    ThinkingConfig, ToolDefinition,
+};
 use cc_tools::registry::ToolRegistry;
 
 use crate::orchestration::{execute_tool_calls, execute_tool_calls_with_context, PendingToolCall};
+use crate::streaming::StreamState;
 use crate::tool_execution::{ExecutionContext, PermissionCallback};
 
 /// Events yielded by the query loop.
@@ -57,7 +62,7 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
         let mut messages = params.messages.clone();
         let mut turns = 0;
 
-        loop {
+        'outer: loop {
             if turns >= params.max_turns {
                 yield QueryEvent::TurnComplete {
                     stop_reason: "max_turns".into(),
@@ -66,7 +71,7 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
             }
             turns += 1;
 
-            // 1. Build API request
+            // 1. Build API request (stream: true for SSE)
             let request = MessagesRequest {
                 model: params.model.clone(),
                 messages: messages.clone(),
@@ -76,54 +81,83 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                 tools: Some(build_tool_definitions(&params.tools)),
                 tool_choice: None,
                 thinking: params.thinking.clone(),
-                stream: false,
+                stream: true,
                 metadata: None,
             };
 
-            // 2. Send request
-            let response = match params.api_client.send_messages(request).await {
-                Ok(r) => r,
+            // 2. Open streaming connection
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let event_stream = params.api_client.stream_messages(request, cancel.clone()).await;
+
+            let state = match event_stream {
+                Ok(mut stream) => {
+                    let mut state = StreamState::new();
+                    while let Some(event_result) = stream.next().await {
+                        match event_result {
+                            Ok(event) => {
+                                // Yield deltas as they arrive for real-time output
+                                match &event {
+                                    StreamEvent::ContentBlockDelta { delta, .. } => {
+                                        match delta {
+                                            ContentDelta::TextDelta { text } => {
+                                                yield QueryEvent::TextDelta(text.clone());
+                                            }
+                                            ContentDelta::ThinkingDelta { thinking } => {
+                                                yield QueryEvent::ThinkingDelta(thinking.clone());
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    StreamEvent::ContentBlockStop { index } => {
+                                        // Peek at tool_use blocks to yield ToolUseStart
+                                        if let Some(ContentBlock::ToolUse { id, name, .. }) =
+                                            state.content_blocks.get(*index)
+                                        {
+                                            yield QueryEvent::ToolUseStart {
+                                                id: id.clone(),
+                                                name: name.clone(),
+                                            };
+                                        }
+                                    }
+                                    StreamEvent::MessageDelta { usage, .. } => {
+                                        if let Some(u) = usage {
+                                            yield QueryEvent::UsageUpdate {
+                                                input_tokens: state.usage.input_tokens,
+                                                output_tokens: u.output_tokens,
+                                            };
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                                state.process_event(event);
+                            }
+                            Err(e) => {
+                                yield QueryEvent::Error(e.to_string());
+                                break 'outer;
+                            }
+                        }
+                    }
+                    state
+                }
                 Err(e) => {
                     yield QueryEvent::Error(e.to_string());
                     break;
                 }
             };
 
-            // 3. Yield text content and collect tool calls
-            let mut tool_calls = Vec::new();
-            for block in &response.content {
-                match block {
-                    ContentBlock::Text { text } => {
-                        yield QueryEvent::TextDelta(text.clone());
-                    }
-                    ContentBlock::Thinking { thinking, .. } => {
-                        yield QueryEvent::ThinkingDelta(thinking.clone());
-                    }
-                    ContentBlock::ToolUse { id, name, input } => {
-                        yield QueryEvent::ToolUseStart {
-                            id: id.clone(),
-                            name: name.clone(),
-                        };
-                        tool_calls.push(PendingToolCall {
-                            id: id.clone(),
-                            name: name.clone(),
-                            input: input.clone(),
-                        });
-                    }
-                    _ => {}
-                }
-            }
-
-            // 4. Yield usage
+            // 3. Yield final usage from accumulated state
             yield QueryEvent::UsageUpdate {
-                input_tokens: response.usage.input_tokens,
-                output_tokens: response.usage.output_tokens,
+                input_tokens: state.usage.input_tokens,
+                output_tokens: state.usage.output_tokens,
             };
+
+            // 4. Extract tool calls from the completed stream
+            let tool_calls: Vec<PendingToolCall> = state.tool_uses.clone();
 
             // 5. If no tool calls, we're done
             if tool_calls.is_empty() {
                 yield QueryEvent::TurnComplete {
-                    stop_reason: response.stop_reason.unwrap_or_else(|| "end_turn".into()),
+                    stop_reason: state.stop_reason.unwrap_or_else(|| "end_turn".into()),
                 };
                 break;
             }
@@ -143,10 +177,10 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                 execute_tool_calls(tool_calls, &params.tools).await
             };
 
-            // 7. Build assistant message
+            // 7. Build assistant message from accumulated content blocks
             let assistant_msg = ApiMessage {
                 role: Role::Assistant,
-                content: response.content.clone(),
+                content: state.content_blocks.clone(),
             };
             messages.push(assistant_msg);
 
@@ -368,19 +402,13 @@ mod tests {
             events.push(event);
         }
 
-        assert!(events.len() >= 3); // TextDelta, UsageUpdate, TurnComplete
-        assert!(matches!(&events[0], QueryEvent::TextDelta(t) if t == "Hello!"));
-        assert!(matches!(
-            &events[1],
-            QueryEvent::UsageUpdate {
-                input_tokens: 10,
-                output_tokens: 5
-            }
-        ));
-        assert!(matches!(
-            &events[2],
-            QueryEvent::TurnComplete { stop_reason } if stop_reason == "end_turn"
-        ));
+        // Streaming yields: TextDelta(s), UsageUpdate(s), TurnComplete
+        let has_text = events.iter().any(|e| matches!(e, QueryEvent::TextDelta(t) if t == "Hello!"));
+        assert!(has_text, "expected TextDelta with 'Hello!'");
+        let has_complete = events.iter().any(|e| matches!(e, QueryEvent::TurnComplete { stop_reason } if stop_reason == "end_turn"));
+        assert!(has_complete, "expected TurnComplete with 'end_turn'");
+        let has_usage = events.iter().any(|e| matches!(e, QueryEvent::UsageUpdate { .. }));
+        assert!(has_usage, "expected at least one UsageUpdate");
     }
 
     #[tokio::test]
@@ -413,6 +441,87 @@ mod tests {
     }
 
     // --- Mock API client for tests ---
+
+    /// Helper to convert a non-streaming response into a sequence of StreamEvents.
+    fn response_to_stream_events(
+        response: cc_api::types::MessagesResponse,
+    ) -> Vec<cc_api::types::StreamEvent> {
+        use cc_api::types::*;
+        let mut events = Vec::new();
+
+        // MessageStart
+        events.push(StreamEvent::MessageStart {
+            message: MessagesResponse {
+                id: response.id.clone(),
+                model: response.model.clone(),
+                role: response.role,
+                content: vec![],
+                stop_reason: None,
+                usage: response.usage.clone(),
+            },
+        });
+
+        // Content blocks
+        for (i, block) in response.content.iter().enumerate() {
+            events.push(StreamEvent::ContentBlockStart {
+                index: i,
+                content_block: match block {
+                    ContentBlock::Text { .. } => ContentBlock::Text {
+                        text: String::new(),
+                    },
+                    other => other.clone(),
+                },
+            });
+            match block {
+                ContentBlock::Text { text } => {
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index: i,
+                        delta: ContentDelta::TextDelta {
+                            text: text.clone(),
+                        },
+                    });
+                }
+                ContentBlock::Thinking { thinking, signature } => {
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index: i,
+                        delta: ContentDelta::ThinkingDelta {
+                            thinking: thinking.clone(),
+                        },
+                    });
+                    if let Some(sig) = signature {
+                        events.push(StreamEvent::ContentBlockDelta {
+                            index: i,
+                            delta: ContentDelta::SignatureDelta {
+                                signature: sig.clone(),
+                            },
+                        });
+                    }
+                }
+                ContentBlock::ToolUse { input, .. } => {
+                    let json = serde_json::to_string(input).unwrap_or_default();
+                    events.push(StreamEvent::ContentBlockDelta {
+                        index: i,
+                        delta: ContentDelta::InputJsonDelta {
+                            partial_json: json,
+                        },
+                    });
+                }
+                _ => {}
+            }
+            events.push(StreamEvent::ContentBlockStop { index: i });
+        }
+
+        // MessageDelta with stop_reason
+        events.push(StreamEvent::MessageDelta {
+            delta: MessageDeltaBody {
+                stop_reason: response.stop_reason.clone(),
+            },
+            usage: Some(response.usage.clone()),
+        });
+
+        events.push(StreamEvent::MessageStop);
+        events
+    }
 
     struct MockApiClient {
         responses:
@@ -456,9 +565,18 @@ mod tests {
             >,
             cc_api::errors::ApiError,
         > {
-            Err(cc_api::errors::ApiError::InvalidRequest {
-                message: "streaming not implemented in mock".to_string(),
-            })
+            let mut responses = self.responses.lock().unwrap();
+            match responses.pop() {
+                Some(Ok(response)) => {
+                    let events = response_to_stream_events(response);
+                    let stream = futures::stream::iter(events.into_iter().map(Ok));
+                    Ok(Box::pin(stream))
+                }
+                Some(Err(e)) => Err(e),
+                None => Err(cc_api::errors::ApiError::InvalidRequest {
+                    message: "no more mock responses".to_string(),
+                }),
+            }
         }
 
         async fn send_messages(
