@@ -1,6 +1,6 @@
 # Slash Commands Reference
 
-A complete reference for all 99 slash commands available in Claude Code, organized into 13 categories.
+Полный справочник по 99 слэш-командам Claude Code RS, разбитым на 13 категорий.
 
 ---
 
@@ -70,7 +70,7 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 | `/files` | List recently modified files |
 | `/memory` | View or edit CLAUDE.md memory files |
 | `/add-dir` | Add additional working directory |
-| `/cost` | Show token usage and cost for this session |
+| `/teleport` | Change working directory |
 
 ---
 
@@ -110,7 +110,6 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 | `/bridge` | Manage bidirectional bridge connection |
 | `/remote-env` | Configure the default remote environment for teleport sessions |
 | `/remote-setup` | Set up remote development environment |
-| `/teleport` | Change working directory |
 
 ---
 
@@ -136,6 +135,7 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 | `/login` | Login to Anthropic |
 | `/logout` | Logout from Anthropic |
 | `/oauth-refresh` | Refresh OAuth tokens |
+| `/cost` | Show token usage and cost for this session |
 | `/usage` | Show token usage details |
 | `/extra-usage` | Show extended usage information and tips |
 | `/passes` | Show available Claude Code passes and subscription info |
@@ -179,6 +179,8 @@ A complete reference for all 99 slash commands available in Claude Code, organiz
 ---
 
 ## Внутренние
+
+> **Внимание:** Эти команды предназначены исключительно для внутреннего использования командой Anthropic. Они могут изменяться без предупреждения и вызывать непредвиденное поведение.
 
 | Команда | Описание |
 |---------|----------|
