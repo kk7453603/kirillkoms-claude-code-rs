@@ -90,6 +90,9 @@ pub(crate) struct ResponseMessage {
     pub role: Option<String>,
     #[serde(default)]
     pub content: Option<String>,
+    /// Ollama thinking models (Qwen3/3.5) put responses here instead of `content`.
+    #[serde(default)]
+    pub reasoning: Option<String>,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCall>>,
 }
@@ -101,6 +104,9 @@ pub(crate) struct ResponseDelta {
     pub role: Option<String>,
     #[serde(default)]
     pub content: Option<String>,
+    /// Ollama thinking models stream reasoning here when `content` is empty.
+    #[serde(default)]
+    pub reasoning: Option<String>,
     #[serde(default)]
     pub tool_calls: Option<Vec<ToolCallDelta>>,
 }

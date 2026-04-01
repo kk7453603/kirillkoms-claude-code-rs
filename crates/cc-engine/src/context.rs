@@ -58,7 +58,13 @@ impl SystemContext {
             let mut parts = Vec::new();
 
             parts.push(format!(
-                "You are Claude, an AI assistant. Current date: {}. OS: {}. Working directory: {}.",
+                "You are an AI coding assistant. You help users with software engineering tasks.\n\
+                 Current date: {}. OS: {}. Working directory: {}.\n\n\
+                 When using tools, follow these principles:\n\
+                 - Read files before modifying them\n\
+                 - Use the appropriate tool for each task (Bash for commands, Read for files, Grep for search)\n\
+                 - Handle errors gracefully and report them clearly\n\
+                 - Be concise in your responses",
                 self.date, self.os, self.cwd
             ));
 
@@ -128,7 +134,7 @@ mod tests {
                 text,
                 cache_control,
             } => {
-                assert!(text.contains("Claude"));
+                assert!(text.contains("AI coding assistant"));
                 assert!(cache_control.is_some());
             }
         }

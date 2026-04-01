@@ -239,12 +239,16 @@ pub(crate) fn translate_response(resp: ChatCompletionResponse) -> MessagesRespon
 
     if let Some(c) = &choice {
         if let Some(ref msg) = c.message {
-            // Text content
-            if let Some(ref text) = msg.content
-                && !text.is_empty()
-            {
+            // Text content (with reasoning fallback for thinking models)
+            let effective_content = msg
+                .content
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .or(msg.reasoning.as_deref().filter(|s| !s.is_empty()));
+
+            if let Some(text) = effective_content {
                 content.push(ContentBlock::Text {
-                    text: text.clone(),
+                    text: text.to_string(),
                 });
             }
 
@@ -363,10 +367,14 @@ pub(crate) fn translate_stream_chunk(
     };
 
     if let Some(delta) = &choice.delta {
-        // Handle text content
-        if let Some(ref text) = delta.content
-            && !text.is_empty()
-        {
+        // Handle text content (with reasoning fallback for thinking models)
+        let effective_text = delta
+            .content
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .or(delta.reasoning.as_deref().filter(|s| !s.is_empty()));
+
+        if let Some(text) = effective_text {
             if !state.text_block_started {
                 state.text_block_started = true;
                 events.push(StreamEvent::ContentBlockStart {
@@ -379,7 +387,7 @@ pub(crate) fn translate_stream_chunk(
             events.push(StreamEvent::ContentBlockDelta {
                 index: state.current_content_index,
                 delta: ContentDelta::TextDelta {
-                    text: text.clone(),
+                    text: text.to_string(),
                 },
             });
         }
@@ -767,6 +775,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: Some("Hello!".to_string()),
+                    reasoning: None,
                     tool_calls: None,
                 }),
                 delta: None,
@@ -802,6 +811,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: None,
+                    reasoning: None,
                     tool_calls: Some(vec![ToolCall {
                         id: "call_abc".to_string(),
                         call_type: "function".to_string(),
@@ -870,6 +880,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: Some("assistant".to_string()),
                     content: None,
+                        reasoning: None,
                     tool_calls: None,
                 }),
                 finish_reason: None,
@@ -890,6 +901,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: None,
                     content: Some("Hello".to_string()),
+                        reasoning: None,
                     tool_calls: None,
                 }),
                 finish_reason: None,
@@ -911,6 +923,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: None,
                     content: Some(" world".to_string()),
+                        reasoning: None,
                     tool_calls: None,
                 }),
                 finish_reason: None,
@@ -931,6 +944,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: None,
                     content: None,
+                        reasoning: None,
                     tool_calls: None,
                 }),
                 finish_reason: Some("stop".to_string()),
@@ -969,6 +983,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: Some("assistant".into()),
                     content: None,
+                        reasoning: None,
                     tool_calls: None,
                 }),
                 finish_reason: None,
@@ -986,6 +1001,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: None,
                     content: None,
+                        reasoning: None,
                     tool_calls: Some(vec![ToolCallDelta {
                         index: 0,
                         id: Some("call_1".into()),
@@ -1017,6 +1033,7 @@ mod tests {
                 delta: Some(ResponseDelta {
                     role: None,
                     content: None,
+                        reasoning: None,
                     tool_calls: Some(vec![ToolCallDelta {
                         index: 0,
                         id: None,
@@ -1044,7 +1061,7 @@ mod tests {
             choices: vec![Choice {
                 index: 0, message: None,
                 delta: Some(ResponseDelta {
-                    role: None, content: None, tool_calls: None,
+                    role: None, content: None, reasoning: None, tool_calls: None,
                 }),
                 finish_reason: Some("tool_calls".into()),
             }],
@@ -1070,7 +1087,7 @@ mod tests {
                 index: 0, message: None,
                 delta: Some(ResponseDelta {
                     role: Some("assistant".into()), content: Some("Let me check.".into()),
-                    tool_calls: None,
+                    reasoning: None, tool_calls: None,
                 }),
                 finish_reason: None,
             }],
@@ -1086,7 +1103,7 @@ mod tests {
             choices: vec![Choice {
                 index: 0, message: None,
                 delta: Some(ResponseDelta {
-                    role: None, content: None,
+                    role: None, content: None, reasoning: None,
                     tool_calls: Some(vec![ToolCallDelta {
                         index: 0,
                         id: Some("call_x".into()),
@@ -1125,6 +1142,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: Some(String::new()), // empty content from thinking model
+                    reasoning: None,
                     tool_calls: None,
                 }),
                 delta: None,
@@ -1158,6 +1176,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: None,
+                    reasoning: None,
                     tool_calls: Some(vec![ToolCall {
                         id: "call_1".to_string(),
                         call_type: "function".to_string(),
@@ -1191,6 +1210,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: None,
+                    reasoning: None,
                     tool_calls: Some(vec![ToolCall {
                         id: "call_bad".to_string(),
                         call_type: "function".to_string(),
@@ -1229,6 +1249,7 @@ mod tests {
                 message: Some(ResponseMessage {
                     role: Some("assistant".to_string()),
                     content: Some("I'll read both files.".to_string()),
+                    reasoning: None,
                     tool_calls: Some(vec![
                         ToolCall {
                             id: "call_a".to_string(),
@@ -1278,7 +1299,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, reasoning: None, tool_calls: None }),
                     finish_reason: None,
                 }],
                 usage: None,
@@ -1292,7 +1313,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: None, content: Some("Hi".into()), tool_calls: None }),
+                    delta: Some(ResponseDelta { role: None, content: Some("Hi".into()), reasoning: None, tool_calls: None }),
                     finish_reason: None,
                 }],
                 usage: None,
@@ -1316,7 +1337,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: None, content: None, tool_calls: None }),
+                    delta: Some(ResponseDelta { role: None, content: None, reasoning: None, tool_calls: None }),
                     finish_reason: Some("stop".into()),
                 }],
                 usage: None,
@@ -1346,7 +1367,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, reasoning: None, tool_calls: None }),
                     finish_reason: None,
                 }],
                 usage: None,
@@ -1361,7 +1382,7 @@ mod tests {
                 choices: vec![Choice {
                     index: 0, message: None,
                     delta: Some(ResponseDelta {
-                        role: None, content: None,
+                        role: None, content: None, reasoning: None,
                         tool_calls: Some(vec![ToolCallDelta {
                             index: 0,
                             id: Some("call_1".into()),
@@ -1387,7 +1408,7 @@ mod tests {
                 choices: vec![Choice {
                     index: 0, message: None,
                     delta: Some(ResponseDelta {
-                        role: None, content: None,
+                        role: None, content: None, reasoning: None,
                         tool_calls: Some(vec![ToolCallDelta {
                             index: 1,
                             id: Some("call_2".into()),
@@ -1413,7 +1434,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: None, content: None, tool_calls: None }),
+                    delta: Some(ResponseDelta { role: None, content: None, reasoning: None, tool_calls: None }),
                     finish_reason: Some("tool_calls".into()),
                 }],
                 usage: None,
@@ -1492,7 +1513,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, reasoning: None, tool_calls: None }),
                     finish_reason: None,
                 }],
                 usage: None,
@@ -1506,7 +1527,7 @@ mod tests {
                 id: "c".into(), model: "m".into(),
                 choices: vec![Choice {
                     index: 0, message: None,
-                    delta: Some(ResponseDelta { role: None, content: Some("".into()), tool_calls: None }),
+                    delta: Some(ResponseDelta { role: None, content: Some("".into()), reasoning: None, tool_calls: None }),
                     finish_reason: None,
                 }],
                 usage: None,
@@ -1516,5 +1537,116 @@ mod tests {
 
         assert!(events.is_empty(), "empty text delta should produce no events");
         assert!(!state.text_block_started, "text block should not have started");
+    }
+
+    // ── Reasoning fallback tests ────────────────────────────────────────
+
+    // REG-10: Non-streaming — empty content + filled reasoning → Text block
+    #[test]
+    fn regression_reasoning_fallback_non_streaming() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-reason".to_string(),
+            model: "qwen3:14b".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: Some(String::new()),
+                    reasoning: Some("The answer is 42.".to_string()),
+                    tool_calls: None,
+                }),
+                delta: None,
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: Some(ChatUsage { prompt_tokens: 10, completion_tokens: 20 }),
+        };
+
+        let result = translate_response(resp);
+        assert_eq!(result.content.len(), 1);
+        match &result.content[0] {
+            ContentBlock::Text { text } => assert_eq!(text, "The answer is 42."),
+            _ => panic!("expected Text block from reasoning fallback"),
+        }
+    }
+
+    // REG-11: Non-streaming — content present → reasoning ignored
+    #[test]
+    fn regression_reasoning_ignored_when_content_present() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-both".to_string(),
+            model: "qwen3:14b".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: Some("Real answer".to_string()),
+                    reasoning: Some("Long thinking process...".to_string()),
+                    tool_calls: None,
+                }),
+                delta: None,
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: None,
+        };
+
+        let result = translate_response(resp);
+        assert_eq!(result.content.len(), 1);
+        match &result.content[0] {
+            ContentBlock::Text { text } => assert_eq!(text, "Real answer"),
+            _ => panic!("expected Text with content, not reasoning"),
+        }
+    }
+
+    // REG-12: Streaming — reasoning deltas when content is empty
+    #[test]
+    fn regression_reasoning_fallback_streaming() {
+        let mut state = StreamTranslationState::new();
+
+        // MessageStart
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "qwen3:14b".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta {
+                        role: Some("assistant".into()),
+                        content: None, reasoning: None, tool_calls: None,
+                    }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // Reasoning delta (content empty)
+        let events = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "qwen3:14b".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta {
+                        role: None,
+                        content: None,
+                        reasoning: Some("Let me think about this...".into()),
+                        tool_calls: None,
+                    }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // Should produce ContentBlockStart + TextDelta from reasoning
+        assert_eq!(events.len(), 2);
+        assert!(matches!(&events[0], StreamEvent::ContentBlockStart { .. }));
+        match &events[1] {
+            StreamEvent::ContentBlockDelta { delta: ContentDelta::TextDelta { text }, .. } => {
+                assert_eq!(text, "Let me think about this...");
+            }
+            _ => panic!("expected TextDelta from reasoning fallback"),
+        }
+        assert!(state.text_block_started);
     }
 }

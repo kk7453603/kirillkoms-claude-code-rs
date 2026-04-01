@@ -134,6 +134,11 @@ async fn build_engine(
 
     let mut engine = QueryEngine::new(api_client, model);
 
+    // Set up turn timeout from env
+    if let Some(secs) = cc_config::env::EnvConfig::from_env().turn_timeout_secs {
+        engine.turn_timeout = Some(std::time::Duration::from_secs(secs));
+    }
+
     // Set up tools
     engine.tools = Arc::new(cc_tools::registry::ToolRegistry::with_defaults());
 

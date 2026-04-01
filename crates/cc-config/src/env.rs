@@ -38,6 +38,8 @@ pub struct EnvConfig {
     pub bash_max_timeout_ms: Option<u64>,
     pub bash_max_output_length: Option<usize>,
     pub max_output_tokens: Option<u64>,
+    /// Idle timeout per turn in seconds. 0 = disabled (default).
+    pub turn_timeout_secs: Option<u64>,
 
     // Behavior
     pub disable_telemetry: bool,
@@ -110,6 +112,7 @@ impl EnvConfig {
             bash_max_timeout_ms: get_u64("CLAUDE_BASH_MAX_TIMEOUT_MS"),
             bash_max_output_length: get_u64("CLAUDE_BASH_MAX_OUTPUT_LENGTH").map(|v| v as usize),
             max_output_tokens: get_u64("CLAUDE_MAX_OUTPUT_TOKENS"),
+            turn_timeout_secs: get_u64("CLAUDE_CODE_TURN_TIMEOUT").filter(|&v| v > 0),
 
             // Behavior
             disable_telemetry: get_bool("CLAUDE_DISABLE_TELEMETRY"),
@@ -175,6 +178,7 @@ impl Default for EnvConfig {
             bash_max_timeout_ms: None,
             bash_max_output_length: None,
             max_output_tokens: None,
+            turn_timeout_secs: None,
             disable_telemetry: false,
             disable_error_reporting: false,
             disable_auto_updater: false,

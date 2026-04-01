@@ -51,13 +51,20 @@ pub struct QueryParams {
     pub thinking: Option<ThinkingConfig>,
     pub execution_context: Option<ExecutionContext>,
     pub permission_callback: Option<Arc<dyn PermissionCallback>>,
+    /// Session-level cache: does this model support function calling?
+    /// `None` = unknown, `Some(false)` = no support (use text-based fallback).
+    pub tools_supported: Option<bool>,
+    /// Idle timeout per turn. If no SSE chunk arrives within this duration,
+    /// the stream is cancelled and a partial response is returned.
+    /// `None` = no timeout (default).
+    pub turn_timeout: Option<std::time::Duration>,
 }
 
 /// Run the main query loop.
 ///
 /// This sends messages to the API, processes tool calls, and yields events.
 /// The loop continues until the model stops requesting tools or max_turns is reached.
-pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
+pub fn query(mut params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
     stream! {
         let mut messages = params.messages.clone();
         let mut turns = 0;
@@ -71,14 +78,29 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
             }
             turns += 1;
 
-            // 1. Build API request (stream: true for SSE)
+            // 1. Build API request — omit tools if model doesn't support them
+            let use_native_tools = params.tools_supported != Some(false);
+            let mut system = params.system.clone();
+
+            let tools = if use_native_tools {
+                Some(build_tool_definitions(&params.tools))
+            } else {
+                // Inject text-based tool descriptions into system prompt
+                let tool_text = build_text_tool_descriptions(&params.tools);
+                system.push(SystemBlock::Text {
+                    text: tool_text,
+                    cache_control: None,
+                });
+                None
+            };
+
             let request = MessagesRequest {
                 model: params.model.clone(),
                 messages: messages.clone(),
-                system: params.system.clone(),
+                system,
                 max_tokens: Some(params.max_tokens),
                 temperature: None,
-                tools: Some(build_tool_definitions(&params.tools)),
+                tools,
                 tool_choice: None,
                 thinking: params.thinking.clone(),
                 stream: true,
@@ -89,12 +111,61 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
             let cancel = tokio_util::sync::CancellationToken::new();
             let event_stream = params.api_client.stream_messages(request, cancel.clone()).await;
 
+            // 2a. Handle "does not support tools" error with retry
+            let event_stream = match event_stream {
+                Err(ref e) if use_native_tools && is_tools_not_supported_error(e) => {
+                    tracing::info!("Model does not support native tools, switching to text-based fallback");
+                    params.tools_supported = Some(false);
+
+                    // Rebuild request without tools
+                    let mut retry_system = params.system.clone();
+                    let tool_text = build_text_tool_descriptions(&params.tools);
+                    retry_system.push(SystemBlock::Text {
+                        text: tool_text,
+                        cache_control: None,
+                    });
+
+                    let retry_request = MessagesRequest {
+                        model: params.model.clone(),
+                        messages: messages.clone(),
+                        system: retry_system,
+                        max_tokens: Some(params.max_tokens),
+                        temperature: None,
+                        tools: None,
+                        tool_choice: None,
+                        thinking: params.thinking.clone(),
+                        stream: true,
+                        metadata: None,
+                    };
+
+                    let retry_cancel = tokio_util::sync::CancellationToken::new();
+                    params.api_client.stream_messages(retry_request, retry_cancel).await
+                }
+                other => other,
+            };
+
             let state = match event_stream {
                 Ok(mut stream) => {
                     let mut state = StreamState::new();
-                    while let Some(event_result) = stream.next().await {
-                        match event_result {
-                            Ok(event) => {
+                    let mut timed_out = false;
+
+                    loop {
+                        // Apply idle timeout if configured
+                        let next_event = if let Some(timeout) = params.turn_timeout {
+                            match tokio::time::timeout(timeout, stream.next()).await {
+                                Ok(event) => event,
+                                Err(_) => {
+                                    // Idle timeout — no chunk received within duration
+                                    timed_out = true;
+                                    None
+                                }
+                            }
+                        } else {
+                            stream.next().await
+                        };
+
+                        match next_event {
+                            Some(Ok(event)) => {
                                 // Yield deltas as they arrive for real-time output
                                 match &event {
                                     StreamEvent::ContentBlockDelta { delta, .. } => {
@@ -131,12 +202,22 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                                 }
                                 state.process_event(event);
                             }
-                            Err(e) => {
+                            Some(Err(e)) => {
                                 yield QueryEvent::Error(e.to_string());
                                 break 'outer;
                             }
+                            None => break, // Stream ended (or timed out)
                         }
                     }
+
+                    if timed_out {
+                        let secs = params.turn_timeout.map(|d| d.as_secs()).unwrap_or(0);
+                        yield QueryEvent::TextDelta(format!(
+                            "\n\n[Response truncated: no data received for {}s]", secs
+                        ));
+                        state.stop_reason = Some("timeout".to_string());
+                    }
+
                     state
                 }
                 Err(e) => {
@@ -151,8 +232,23 @@ pub fn query(params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                 output_tokens: state.usage.output_tokens,
             };
 
-            // 4. Extract tool calls from the completed stream
-            let tool_calls: Vec<PendingToolCall> = state.tool_uses.clone();
+            // 4. Extract tool calls — from native tool_use blocks or text-based fallback
+            let tool_calls: Vec<PendingToolCall> = if params.tools_supported == Some(false) {
+                // Parse tool calls from text content
+                let text = state.content_blocks.iter()
+                    .filter_map(|b| match b {
+                        ContentBlock::Text { text } => Some(text.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join("");
+                parse_tool_calls_from_text(&text)
+            } else {
+                if !state.tool_uses.is_empty() {
+                    params.tools_supported = Some(true);
+                }
+                state.tool_uses.clone()
+            };
 
             // 5. If no tool calls, we're done
             if tool_calls.is_empty() {
@@ -222,6 +318,83 @@ pub fn build_tool_definitions(registry: &ToolRegistry) -> Vec<ToolDefinition> {
             input_schema: t.input_schema(),
         })
         .collect()
+}
+
+/// Build a text-based description of tools for injection into the system prompt.
+/// Used as fallback when the model does not support native function calling.
+fn build_text_tool_descriptions(registry: &ToolRegistry) -> String {
+    let mut desc = String::from(
+        "You have access to these tools. To use a tool, respond with a JSON block:\n\n\
+         ```tool_call\n\
+         {\"name\": \"tool_name\", \"arguments\": {\"key\": \"value\"}}\n\
+         ```\n\n\
+         You may use multiple tool_call blocks in a single response.\n\n\
+         Available tools:\n",
+    );
+
+    for tool in registry.enabled_tools() {
+        desc.push_str(&format!("- **{}**: {}\n", tool.name(), tool.description()));
+    }
+
+    desc
+}
+
+/// Check if an API error indicates the model does not support tools.
+fn is_tools_not_supported_error(err: &cc_api::errors::ApiError) -> bool {
+    let msg = err.to_string().to_lowercase();
+    msg.contains("does not support tools")
+        || msg.contains("does not support functions")
+        || msg.contains("tool_use is not supported")
+        || msg.contains("tools is not supported")
+}
+
+/// Parse tool calls from text content (for models without native function calling).
+///
+/// Looks for ```tool_call ... ``` blocks, extracts JSON, and creates PendingToolCall entries.
+fn parse_tool_calls_from_text(text: &str) -> Vec<PendingToolCall> {
+    let mut calls = Vec::new();
+    let mut search_from = 0;
+
+    while let Some(start) = text[search_from..].find("```tool_call") {
+        let abs_start = search_from + start;
+        // Find the end of the opening fence line
+        let json_start = match text[abs_start..].find('\n') {
+            Some(pos) => abs_start + pos + 1,
+            None => break,
+        };
+        // Find the closing fence
+        let json_end = match text[json_start..].find("```") {
+            Some(pos) => json_start + pos,
+            None => break,
+        };
+
+        let json_str = text[json_start..json_end].trim();
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
+            let name = parsed
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let arguments = parsed
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::json!({}));
+
+            if !name.is_empty() {
+                calls.push(PendingToolCall {
+                    id: format!("text_call_{}", calls.len()),
+                    name,
+                    input: arguments,
+                });
+            }
+        } else {
+            tracing::warn!("Failed to parse text-based tool call: {}", json_str);
+        }
+
+        search_from = json_end + 3;
+    }
+
+    calls
 }
 
 #[cfg(test)]
@@ -342,6 +515,8 @@ mod tests {
             thinking: None,
             execution_context: None,
             permission_callback: None,
+            tools_supported: None,
+            turn_timeout: None,
         };
 
         let mut stream = std::pin::pin!(query(params));
@@ -390,6 +565,8 @@ mod tests {
             thinking: None,
             execution_context: None,
             permission_callback: None,
+            tools_supported: None,
+            turn_timeout: None,
         };
 
         let mut stream = std::pin::pin!(query(params));
@@ -433,6 +610,8 @@ mod tests {
             thinking: None,
             execution_context: None,
             permission_callback: None,
+            tools_supported: None,
+            turn_timeout: None,
         };
 
         let mut stream = std::pin::pin!(query(params));
@@ -588,5 +767,81 @@ mod tests {
                     message: "no more mock responses".to_string(),
                 }))
         }
+    }
+
+    // ── Tool-fallback tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_is_tools_not_supported_error() {
+        let err1 = cc_api::errors::ApiError::InvalidRequest {
+            message: "registry.ollama.ai/library/dolphin-llama3:latest does not support tools"
+                .into(),
+        };
+        assert!(is_tools_not_supported_error(&err1));
+
+        let err2 = cc_api::errors::ApiError::InvalidRequest {
+            message: "model does not support functions".into(),
+        };
+        assert!(is_tools_not_supported_error(&err2));
+
+        let err3 = cc_api::errors::ApiError::InvalidRequest {
+            message: "invalid max_tokens value".into(),
+        };
+        assert!(!is_tools_not_supported_error(&err3));
+    }
+
+    #[test]
+    fn test_parse_tool_calls_from_text_valid() {
+        let text = r#"I'll read the file for you.
+
+```tool_call
+{"name": "Read", "arguments": {"file_path": "/tmp/test.txt"}}
+```
+
+Let me also check the directory.
+
+```tool_call
+{"name": "Bash", "arguments": {"command": "ls /tmp"}}
+```
+"#;
+        let calls = parse_tool_calls_from_text(text);
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].name, "Read");
+        assert_eq!(calls[0].input["file_path"], "/tmp/test.txt");
+        assert_eq!(calls[1].name, "Bash");
+        assert_eq!(calls[1].input["command"], "ls /tmp");
+    }
+
+    #[test]
+    fn test_parse_tool_calls_from_text_invalid_json() {
+        let text = r#"```tool_call
+{invalid json here}
+```"#;
+        let calls = parse_tool_calls_from_text(text);
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tool_calls_from_text_no_blocks() {
+        let text = "Just a regular response with no tool calls.";
+        let calls = parse_tool_calls_from_text(text);
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tool_calls_from_text_missing_name() {
+        let text = r#"```tool_call
+{"arguments": {"path": "/tmp"}}
+```"#;
+        let calls = parse_tool_calls_from_text(text);
+        assert!(calls.is_empty()); // empty name → skipped
+    }
+
+    #[test]
+    fn test_build_text_tool_descriptions() {
+        let reg = ToolRegistry::new();
+        let desc = build_text_tool_descriptions(&reg);
+        assert!(desc.contains("tool_call"));
+        assert!(desc.contains("Available tools:"));
     }
 }

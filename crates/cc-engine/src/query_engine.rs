@@ -26,6 +26,10 @@ pub struct QueryEngine {
     /// Session persistence fields
     pub session_id: Option<String>,
     pub sessions_dir: Option<PathBuf>,
+    /// Idle timeout per turn (None = disabled).
+    pub turn_timeout: Option<std::time::Duration>,
+    /// Session-level cache for tool support detection.
+    pub tools_supported: Option<bool>,
 }
 
 impl QueryEngine {
@@ -42,6 +46,8 @@ impl QueryEngine {
             permission_callback: None,
             session_id: None,
             sessions_dir: None,
+            turn_timeout: None,
+            tools_supported: None,
         }
     }
 
@@ -102,6 +108,8 @@ impl QueryEngine {
             thinking: None,
             execution_context: self.execution_context.clone(),
             permission_callback: self.permission_callback.clone(),
+            tools_supported: self.tools_supported,
+            turn_timeout: self.turn_timeout,
         };
 
         let stream = query_loop::query(params);
@@ -206,6 +214,8 @@ impl QueryEngine {
             thinking: None,
             execution_context: self.execution_context.clone(),
             permission_callback: self.permission_callback.clone(),
+            tools_supported: self.tools_supported,
+            turn_timeout: self.turn_timeout,
         };
 
         query_loop::query(params)
