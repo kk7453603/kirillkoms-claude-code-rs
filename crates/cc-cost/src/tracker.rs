@@ -516,7 +516,7 @@ mod tests {
     fn tracker_elapsed_is_positive() {
         let t = CostTracker::new(None);
         // Elapsed should be very small but non-negative
-        assert!(t.elapsed().as_nanos() >= 0);
+        let _ = t.elapsed(); // just verify it doesn't panic
     }
 
     #[test]
