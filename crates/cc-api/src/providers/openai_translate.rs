@@ -1106,4 +1106,415 @@ mod tests {
         assert!(events2.iter().any(|e| matches!(e, StreamEvent::ContentBlockStop { index: 0 })));
         assert!(events2.iter().any(|e| matches!(e, StreamEvent::ContentBlockStart { index: 1, .. })));
     }
+
+    // ── Regression tests ────────────────────────────────────────────────
+    //
+    // These tests cover bugs found during real testing with Ollama and
+    // edge cases from the OpenAI API spec that AI tends to miss.
+
+    // REG-1: Thinking models (Qwen3) return empty content with reasoning field.
+    // Our translator must not create an empty Text block from empty content.
+    // Found during: Ollama testing with qwen3:14b
+    #[test]
+    fn regression_empty_content_from_thinking_model() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-reg1".to_string(),
+            model: "qwen3:14b".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: Some(String::new()), // empty content from thinking model
+                    tool_calls: None,
+                }),
+                delta: None,
+                finish_reason: Some("stop".to_string()),
+            }],
+            usage: Some(ChatUsage {
+                prompt_tokens: 10,
+                completion_tokens: 50,
+            }),
+        };
+
+        let result = translate_response(resp);
+        // Must NOT contain an empty Text block
+        assert!(
+            result.content.is_empty(),
+            "Empty content should not produce a Text block, got: {:?}",
+            result.content
+        );
+        assert_eq!(result.stop_reason, Some("end_turn".to_string()));
+    }
+
+    // REG-2: Null content field (as opposed to empty string).
+    // Some providers return content: null instead of omitting it.
+    #[test]
+    fn regression_null_content_field() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-reg2".to_string(),
+            model: "m".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: None,
+                    tool_calls: Some(vec![ToolCall {
+                        id: "call_1".to_string(),
+                        call_type: "function".to_string(),
+                        function: FunctionCall {
+                            name: "bash".to_string(),
+                            arguments: r#"{"cmd":"ls"}"#.to_string(),
+                        },
+                    }]),
+                }),
+                delta: None,
+                finish_reason: Some("tool_calls".to_string()),
+            }],
+            usage: None,
+        };
+
+        let result = translate_response(resp);
+        // Should have only the ToolUse block, no Text block
+        assert_eq!(result.content.len(), 1);
+        assert!(matches!(&result.content[0], ContentBlock::ToolUse { .. }));
+    }
+
+    // REG-3: Invalid JSON in tool call arguments must not panic.
+    // Real providers sometimes return malformed arguments.
+    #[test]
+    fn regression_invalid_json_in_tool_arguments() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-reg3".to_string(),
+            model: "m".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: None,
+                    tool_calls: Some(vec![ToolCall {
+                        id: "call_bad".to_string(),
+                        call_type: "function".to_string(),
+                        function: FunctionCall {
+                            name: "bash".to_string(),
+                            arguments: "this is not json{".to_string(),
+                        },
+                    }]),
+                }),
+                delta: None,
+                finish_reason: Some("tool_calls".to_string()),
+            }],
+            usage: None,
+        };
+
+        let result = translate_response(resp);
+        // Should not panic — falls back to empty object
+        assert_eq!(result.content.len(), 1);
+        match &result.content[0] {
+            ContentBlock::ToolUse { input, .. } => {
+                assert_eq!(*input, serde_json::json!({}));
+            }
+            _ => panic!("expected ToolUse"),
+        }
+    }
+
+    // REG-4: Multiple tool calls in a single response.
+    // OpenAI can return 2+ tool_calls in one message.
+    #[test]
+    fn regression_multiple_tool_calls_in_response() {
+        let resp = ChatCompletionResponse {
+            id: "chatcmpl-reg4".to_string(),
+            model: "gpt-4o".to_string(),
+            choices: vec![Choice {
+                index: 0,
+                message: Some(ResponseMessage {
+                    role: Some("assistant".to_string()),
+                    content: Some("I'll read both files.".to_string()),
+                    tool_calls: Some(vec![
+                        ToolCall {
+                            id: "call_a".to_string(),
+                            call_type: "function".to_string(),
+                            function: FunctionCall {
+                                name: "read_file".to_string(),
+                                arguments: r#"{"path":"a.rs"}"#.to_string(),
+                            },
+                        },
+                        ToolCall {
+                            id: "call_b".to_string(),
+                            call_type: "function".to_string(),
+                            function: FunctionCall {
+                                name: "read_file".to_string(),
+                                arguments: r#"{"path":"b.rs"}"#.to_string(),
+                            },
+                        },
+                    ]),
+                }),
+                delta: None,
+                finish_reason: Some("tool_calls".to_string()),
+            }],
+            usage: Some(ChatUsage {
+                prompt_tokens: 50,
+                completion_tokens: 30,
+            }),
+        };
+
+        let result = translate_response(resp);
+        // Should have: Text + ToolUse + ToolUse = 3 blocks
+        assert_eq!(result.content.len(), 3);
+        assert!(matches!(&result.content[0], ContentBlock::Text { text } if text == "I'll read both files."));
+        assert!(matches!(&result.content[1], ContentBlock::ToolUse { id, name, .. } if id == "call_a" && name == "read_file"));
+        assert!(matches!(&result.content[2], ContentBlock::ToolUse { id, name, .. } if id == "call_b" && name == "read_file"));
+        assert_eq!(result.stop_reason, Some("tool_use".to_string()));
+    }
+
+    // REG-5: Streaming — usage arrives in a separate chunk with empty choices.
+    // OpenAI sends usage in a final chunk after [DONE]-like finish.
+    #[test]
+    fn regression_stream_usage_in_separate_chunk() {
+        let mut state = StreamTranslationState::new();
+
+        // Chunk 1: role
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // Chunk 2: text
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: None, content: Some("Hi".into()), tool_calls: None }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // Chunk 3: usage arrives BEFORE finish
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![],
+                usage: Some(ChatUsage { prompt_tokens: 100, completion_tokens: 10 }),
+            },
+            &mut state,
+        );
+
+        // Chunk 4: finish
+        let events = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: None, content: None, tool_calls: None }),
+                    finish_reason: Some("stop".into()),
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // MessageDelta should contain the usage from chunk 3
+        let msg_delta = events.iter().find(|e| matches!(e, StreamEvent::MessageDelta { .. }));
+        assert!(msg_delta.is_some(), "should have MessageDelta");
+        if let StreamEvent::MessageDelta { usage, .. } = msg_delta.unwrap() {
+            let u = usage.as_ref().expect("usage should be present from earlier chunk");
+            assert_eq!(u.input_tokens, 100);
+            assert_eq!(u.output_tokens, 10);
+        }
+    }
+
+    // REG-6: Multiple tool calls in streaming mode.
+    // Each tool call gets its own content block index.
+    #[test]
+    fn regression_stream_multiple_tool_calls() {
+        let mut state = StreamTranslationState::new();
+
+        // MessageStart
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // First tool call
+        let events1 = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta {
+                        role: None, content: None,
+                        tool_calls: Some(vec![ToolCallDelta {
+                            index: 0,
+                            id: Some("call_1".into()),
+                            call_type: Some("function".into()),
+                            function: Some(FunctionCallDelta { name: Some("bash".into()), arguments: Some("{}".into()) }),
+                        }]),
+                    }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+        assert!(events1.iter().any(|e| matches!(e,
+            StreamEvent::ContentBlockStart { index: 0, content_block: ContentBlock::ToolUse { name, .. } }
+            if name == "bash"
+        )));
+
+        // Second tool call (different index)
+        let events2 = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta {
+                        role: None, content: None,
+                        tool_calls: Some(vec![ToolCallDelta {
+                            index: 1,
+                            id: Some("call_2".into()),
+                            call_type: Some("function".into()),
+                            function: Some(FunctionCallDelta { name: Some("read".into()), arguments: Some("{}".into()) }),
+                        }]),
+                    }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+        // Second tool should get index 1
+        assert!(events2.iter().any(|e| matches!(e,
+            StreamEvent::ContentBlockStart { index: 1, content_block: ContentBlock::ToolUse { name, .. } }
+            if name == "read"
+        )));
+
+        // Finish
+        let events3 = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: None, content: None, tool_calls: None }),
+                    finish_reason: Some("tool_calls".into()),
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+        // Should close both tool blocks
+        let stop_count = events3.iter().filter(|e| matches!(e, StreamEvent::ContentBlockStop { .. })).count();
+        assert_eq!(stop_count, 2, "should close both tool call blocks");
+    }
+
+    // REG-7: ToolResult with non-string content (object, array, number).
+    // Anthropic ToolResult.content can be any JSON value.
+    #[test]
+    fn regression_tool_result_with_object_content() {
+        let msg = ApiMessage {
+            role: Role::User,
+            content: vec![ContentBlock::ToolResult {
+                tool_use_id: "call_obj".to_string(),
+                content: serde_json::json!({"files": ["a.rs", "b.rs"], "count": 2}),
+                is_error: Some(false),
+            }],
+        };
+
+        let mut out = Vec::new();
+        translate_message(&msg, &mut out);
+
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].role, "tool");
+        // Non-string content should be JSON-serialized to string
+        let content_str = out[0].content.as_ref().unwrap().as_str().unwrap();
+        assert!(content_str.contains("files"));
+        assert!(content_str.contains("a.rs"));
+    }
+
+    // REG-8: User message with ONLY tool results and no text.
+    // Must not produce an empty user message.
+    #[test]
+    fn regression_user_message_only_tool_results() {
+        let msg = ApiMessage {
+            role: Role::User,
+            content: vec![
+                ContentBlock::ToolResult {
+                    tool_use_id: "call_1".to_string(),
+                    content: serde_json::json!("result1"),
+                    is_error: Some(false),
+                },
+                ContentBlock::ToolResult {
+                    tool_use_id: "call_2".to_string(),
+                    content: serde_json::json!("result2"),
+                    is_error: Some(false),
+                },
+            ],
+        };
+
+        let mut out = Vec::new();
+        translate_message(&msg, &mut out);
+
+        // Should produce 2 tool messages, no user message
+        assert_eq!(out.len(), 2);
+        assert!(out.iter().all(|m| m.role == "tool"));
+        assert!(
+            !out.iter().any(|m| m.role == "user"),
+            "should not produce empty user message"
+        );
+    }
+
+    // REG-9: Streaming with empty text deltas (some providers send these).
+    #[test]
+    fn regression_stream_empty_text_deltas_ignored() {
+        let mut state = StreamTranslationState::new();
+
+        // MessageStart
+        translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: Some("assistant".into()), content: None, tool_calls: None }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        // Empty text delta — should not start a text block
+        let events = translate_stream_chunk(
+            ChatCompletionResponse {
+                id: "c".into(), model: "m".into(),
+                choices: vec![Choice {
+                    index: 0, message: None,
+                    delta: Some(ResponseDelta { role: None, content: Some("".into()), tool_calls: None }),
+                    finish_reason: None,
+                }],
+                usage: None,
+            },
+            &mut state,
+        );
+
+        assert!(events.is_empty(), "empty text delta should produce no events");
+        assert!(!state.text_block_started, "text block should not have started");
+    }
 }
