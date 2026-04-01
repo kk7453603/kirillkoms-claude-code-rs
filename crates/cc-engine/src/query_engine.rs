@@ -177,6 +177,9 @@ impl QueryEngine {
             serde_json::json!({ "text": &full_text }),
         );
 
+        // Check if auto-compaction is needed after this turn
+        self.maybe_compact().await;
+
         Ok(full_text)
     }
 
@@ -215,6 +218,59 @@ impl QueryEngine {
         };
 
         query_loop::query(params)
+    }
+
+    /// Estimate total token count across all messages.
+    pub fn estimate_message_tokens(&self) -> usize {
+        self.messages
+            .iter()
+            .flat_map(|m| m.content.iter())
+            .map(|c| match c {
+                ContentBlock::Text { text } => text.len() / 4 + 1,
+                ContentBlock::ToolUse { input, .. } => input.to_string().len() / 4 + 1,
+                ContentBlock::ToolResult { content, .. } => content.to_string().len() / 4 + 1,
+                ContentBlock::Thinking { thinking, .. } => thinking.len() / 4 + 1,
+                _ => 100, // conservative estimate for images etc.
+            })
+            .sum()
+    }
+
+    /// Check if auto-compaction is needed, and if so, compact old messages.
+    pub async fn maybe_compact(&mut self) {
+        let total_tokens = self.estimate_message_tokens();
+        if !cc_compact::autocompact::should_compact(total_tokens, &Default::default()) {
+            return;
+        }
+        if self.messages.len() < 4 {
+            return;
+        }
+        let keep_count = self.messages.len() / 2;
+        let compact_count = self.messages.len() - keep_count;
+        let messages_to_compact = &self.messages[..compact_count];
+
+        match cc_compact::compact::compact_messages(
+            self.api_client.as_ref(),
+            messages_to_compact,
+            &self.model,
+        )
+        .await
+        {
+            Ok(summary) => {
+                let summary_msg = ApiMessage {
+                    role: Role::User,
+                    content: vec![ContentBlock::Text {
+                        text: format!("[Previous conversation summary: {}]", summary),
+                    }],
+                };
+                self.messages = std::iter::once(summary_msg)
+                    .chain(self.messages[compact_count..].iter().cloned())
+                    .collect();
+                tracing::info!("Compacted {} messages into summary", compact_count);
+            }
+            Err(e) => {
+                tracing::warn!("Auto-compaction failed: {}", e);
+            }
+        }
     }
 
     /// Get conversation history.

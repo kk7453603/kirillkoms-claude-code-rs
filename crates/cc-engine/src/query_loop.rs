@@ -328,7 +328,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_max_turns_zero() {
-        use tokio_stream::StreamExt;
 
         let reg = Arc::new(ToolRegistry::new());
         let api_client = Arc::new(MockApiClient::new(vec![]));
@@ -358,7 +357,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_simple_text_response() {
-        use tokio_stream::StreamExt;
 
         let response = cc_api::types::MessagesResponse {
             id: "msg_1".to_string(),
@@ -413,7 +411,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_query_api_error() {
-        use tokio_stream::StreamExt;
 
         let api_client = Arc::new(MockApiClient::new(vec![Err(
             cc_api::errors::ApiError::ConnectionError {
