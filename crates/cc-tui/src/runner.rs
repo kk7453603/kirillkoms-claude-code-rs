@@ -804,6 +804,135 @@ async fn handle_slash_command(
         return None;
     }
 
+    // /btw — side question: separate API call, doesn't affect main conversation
+    if cmd_name == "btw" {
+        if cmd_args.is_empty() {
+            app.add_system_info("Usage: /btw <quick question>\nAsk a side question without interrupting the main conversation.");
+            return None;
+        }
+        app.add_user_message(&format!("/btw {}", cmd_args));
+
+        // Build a one-off request with conversation context but no side effects
+        let side_prompt = format!(
+            "The user has a quick side question (answer briefly, do not use tools):\n\n{}",
+            cmd_args
+        );
+        let mut side_messages = engine.messages.clone();
+        side_messages.push(cc_api::types::ApiMessage {
+            role: cc_api::types::Role::User,
+            content: vec![cc_api::types::ContentBlock::Text { text: side_prompt }],
+        });
+
+        let system = engine.system_context.to_system_blocks();
+        let request = cc_api::types::MessagesRequest {
+            model: engine.model.clone(),
+            messages: side_messages,
+            system,
+            max_tokens: Some(1024),
+            temperature: None,
+            tools: None,
+            tool_choice: None,
+            thinking: None,
+            stream: false,
+            metadata: None,
+        };
+
+        app.thinking = true;
+        app.spinner.set_message("Thinking...");
+
+        match engine.api_client.send_messages(request).await {
+            Ok(resp) => {
+                let answer = resp.content.iter().find_map(|b| {
+                    if let cc_api::types::ContentBlock::Text { text } = b {
+                        Some(text.clone())
+                    } else {
+                        None
+                    }
+                }).unwrap_or_else(|| "(no response)".to_string());
+
+                app.thinking = false;
+                // Show answer as system info — does NOT add to engine.messages
+                app.add_system_info(&answer);
+            }
+            Err(e) => {
+                app.thinking = false;
+                app.on_error(&format!("btw failed: {}", e));
+            }
+        }
+        return None;
+    }
+
+    // /copy — copy last assistant response to clipboard (or show it)
+    if cmd_name == "copy" || cmd_name == "cp" {
+        let last_response = engine.messages.iter().rev().find_map(|m| {
+            if matches!(m.role, cc_api::types::Role::Assistant) {
+                m.content.iter().find_map(|b| {
+                    if let cc_api::types::ContentBlock::Text { text } = b {
+                        Some(text.clone())
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            }
+        });
+        match last_response {
+            Some(text) => {
+                let line_count = text.lines().count();
+                let preview = if text.len() > 100 {
+                    format!("{}...", &text[..100])
+                } else {
+                    text.clone()
+                };
+                app.add_user_message("/copy");
+                app.add_system_info(&format!(
+                    "Last response ({} lines):\n\n{}\n\n(Select text with your terminal mouse to copy)",
+                    line_count, preview
+                ));
+            }
+            None => {
+                app.add_system_info("No assistant response to copy.");
+            }
+        }
+        return None;
+    }
+
+    // /export — save conversation as markdown file
+    if cmd_name == "export" {
+        let filename = if cmd_args.is_empty() {
+            format!("conversation-{}.md", chrono::Utc::now().format("%Y%m%d-%H%M%S"))
+        } else {
+            cmd_args.to_string()
+        };
+
+        let mut md = String::from("# Conversation Export\n\n");
+        for msg in &engine.messages {
+            let role = match msg.role {
+                cc_api::types::Role::User => "**You**",
+                cc_api::types::Role::Assistant => "**Assistant**",
+            };
+            md.push_str(&format!("## {}\n\n", role));
+            for block in &msg.content {
+                if let cc_api::types::ContentBlock::Text { text } = block {
+                    md.push_str(text);
+                    md.push_str("\n\n");
+                }
+            }
+        }
+
+        match std::fs::write(&filename, &md) {
+            Ok(_) => {
+                app.add_user_message("/export");
+                app.add_system_info(&format!("Conversation exported to: {}", filename));
+            }
+            Err(e) => {
+                app.on_error(&format!("Export failed: {}", e));
+            }
+        }
+        return None;
+    }
+
     // 1. Check built-in commands first
     if let Some(cmd_def) = registry.lookup(cmd_name) {
         match (cmd_def.handler)(cmd_args).await {
