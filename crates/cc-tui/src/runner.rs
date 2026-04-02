@@ -28,6 +28,7 @@ pub struct TuiRunner {
     permission_channel: Arc<PermissionChannel>,
     command_registry: cc_commands::registry::CommandRegistry,
     skills: Vec<cc_skills::loader::SkillDefinition>,
+    plugins: Vec<cc_skills::plugin::LoadedPlugin>,
     event_stream: EventStream,
     /// Cached list of available models from the provider (fetched at startup).
     available_models: Vec<(String, String)>, // (id, label)
@@ -39,6 +40,7 @@ impl TuiRunner {
         session_info: SessionInfo,
         command_registry: cc_commands::registry::CommandRegistry,
         skills: Vec<cc_skills::loader::SkillDefinition>,
+        plugins: Vec<cc_skills::plugin::LoadedPlugin>,
     ) -> anyhow::Result<Self> {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -60,6 +62,7 @@ impl TuiRunner {
             permission_channel,
             command_registry,
             skills,
+            plugins,
             event_stream: EventStream::new(),
             available_models: Vec::new(),
         })
@@ -181,6 +184,7 @@ impl TuiRunner {
                                         &mut self.engine,
                                         &self.command_registry,
                                         &self.skills,
+                                        &self.plugins,
                                         &text,
                                     )
                                     .await;
@@ -418,6 +422,7 @@ async fn handle_slash_command(
     engine: &mut QueryEngine,
     registry: &cc_commands::registry::CommandRegistry,
     skills: &[cc_skills::loader::SkillDefinition],
+    plugins: &[cc_skills::plugin::LoadedPlugin],
     input: &str,
 ) -> Option<String> {
     let (cmd_name, cmd_args) = match input[1..].split_once(' ') {
@@ -727,7 +732,11 @@ async fn handle_slash_command(
             .collect();
         let user_defined: Vec<_> = skills
             .iter()
-            .filter(|s| s.source != cc_skills::loader::SkillSource::Bundled)
+            .filter(|s| s.source == cc_skills::loader::SkillSource::UserDefined)
+            .collect();
+        let plugin_skills: Vec<_> = skills
+            .iter()
+            .filter(|s| s.source == cc_skills::loader::SkillSource::Plugin)
             .collect();
 
         if !bundled.is_empty() {
@@ -740,6 +749,13 @@ async fn handle_slash_command(
             lines.push(String::new());
             lines.push("User/Project:".to_string());
             for s in &user_defined {
+                lines.push(format!("  /{:<16} {}", s.name, s.description));
+            }
+        }
+        if !plugin_skills.is_empty() {
+            lines.push(String::new());
+            lines.push("Plugin:".to_string());
+            for s in &plugin_skills {
                 lines.push(format!("  /{:<16} {}", s.name, s.description));
             }
         }
@@ -929,6 +945,101 @@ async fn handle_slash_command(
             Err(e) => {
                 app.on_error(&format!("Export failed: {}", e));
             }
+        }
+        return None;
+    }
+
+    // /plugin — list or inspect loaded plugins
+    if cmd_name == "plugin" {
+        app.add_user_message(&format!("/{} {}", cmd_name, cmd_args).trim_end().to_string());
+
+        // Sub-command: "info <name>"
+        if let Some(plugin_name) = cmd_args.strip_prefix("info").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            match cc_skills::plugin::find_plugin(plugins, plugin_name) {
+                Some(plugin) => {
+                    let m = &plugin.manifest;
+                    // Count plugin skills from the skills list
+                    let skill_count = skills
+                        .iter()
+                        .filter(|s| s.source == cc_skills::loader::SkillSource::Plugin)
+                        .count();
+                    let mut lines = vec![
+                        format!("Plugin: {}", m.name),
+                        format!("  Version:     {}", m.version),
+                        format!(
+                            "  Description: {}",
+                            m.description.as_deref().unwrap_or("(none)")
+                        ),
+                        format!("  Path:        {}", plugin.path.display()),
+                        format!("  Enabled:     {}", plugin.enabled),
+                        format!("  Skills:      {}", skill_count),
+                    ];
+
+                    if !m.commands.is_empty() {
+                        lines.push(String::new());
+                        lines.push("  Commands:".to_string());
+                        for cmd in &m.commands {
+                            lines.push(format!("    {} — {}", cmd.name, cmd.description));
+                        }
+                    }
+
+                    if let Some(hooks) = &m.hooks {
+                        if !hooks.is_empty() {
+                            lines.push(String::new());
+                            lines.push("  Hooks:".to_string());
+                            for hook in hooks {
+                                lines.push(format!("    [{}] {}", hook.event, hook.command));
+                            }
+                        }
+                    }
+
+                    app.add_system_info(&lines.join("\n"));
+                }
+                None => {
+                    app.add_system_info(&format!(
+                        "Plugin '{}' not found.\n\nUse /plugin list to see installed plugins.",
+                        plugin_name
+                    ));
+                }
+            }
+            return None;
+        }
+
+        // Sub-command: "list" (or bare /plugin)
+        if plugins.is_empty() {
+            app.add_system_info(
+                "No plugins installed.\n\n\
+                 To install a plugin, create a directory in ~/.claude/plugins/ \
+                 containing a plugin.json manifest:\n\n\
+                 ~/.claude/plugins/\n\
+                   my-plugin/\n\
+                     plugin.json\n\
+                     skills/\n\
+                       my-skill.md",
+            );
+        } else {
+            let mut lines = vec![
+                format!("Installed Plugins ({})", plugins.len()),
+                String::new(),
+            ];
+            for plugin in plugins {
+                let m = &plugin.manifest;
+                // Count skills contributed by this plugin
+                let skill_count = skills
+                    .iter()
+                    .filter(|s| s.source == cc_skills::loader::SkillSource::Plugin)
+                    .count();
+                lines.push(format!(
+                    "  {} v{}  ({} skills)",
+                    m.name, m.version, skill_count
+                ));
+                if let Some(desc) = &m.description {
+                    lines.push(format!("    {}", desc));
+                }
+            }
+            lines.push(String::new());
+            lines.push("Use /plugin info <name> for details.".to_string());
+            app.add_system_info(&lines.join("\n"));
         }
         return None;
     }

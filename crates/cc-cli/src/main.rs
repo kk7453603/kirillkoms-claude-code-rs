@@ -360,7 +360,11 @@ async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::R
     let command_registry = cc_commands::registry::CommandRegistry::with_defaults();
 
     // Load skills (handled separately from CommandRegistry — used in TUI runner)
-    let skills = load_skills(&project_root);
+    let mut skills = load_skills(&project_root);
+
+    // Load plugins from ~/.claude/plugins/ and merge their skills
+    let (plugins, plugin_skills) = load_plugins();
+    skills.extend(plugin_skills);
 
     // Resolve model display name
     let model_str = args
@@ -384,7 +388,7 @@ async fn run_interactive_mode(args: CliArgs, project_root: PathBuf) -> anyhow::R
     };
 
     // Create TUI runner (enters alternate screen, enables raw mode)
-    let mut runner = TuiRunner::new(engine, session_info, command_registry, skills)?;
+    let mut runner = TuiRunner::new(engine, session_info, command_registry, skills, plugins)?;
 
     // Handle --resume
     if let Some(ref resume_id) = args.resume {
@@ -502,5 +506,50 @@ fn load_skills(project_root: &Path) -> Vec<cc_skills::loader::SkillDefinition> {
     }
 
     skills
+}
+
+/// Load plugins from `~/.claude/plugins/` and collect their skills.
+///
+/// Returns `(plugins, plugin_skills)`.  Skills are loaded from each plugin's
+/// `skills/` subdirectory and tagged with `SkillSource::Plugin`.
+fn load_plugins() -> (
+    Vec<cc_skills::plugin::LoadedPlugin>,
+    Vec<cc_skills::loader::SkillDefinition>,
+) {
+    let plugins_dir = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".claude")
+        .join("plugins");
+
+    let plugins = match cc_skills::plugin::load_plugins(&plugins_dir) {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!("Failed to load plugins from {}: {}", plugins_dir.display(), e);
+            vec![]
+        }
+    };
+
+    let mut plugin_skills: Vec<cc_skills::loader::SkillDefinition> = Vec::new();
+    for plugin in &plugins {
+        match cc_skills::loader::load_plugin_skills(plugin) {
+            Ok(skills) => {
+                tracing::debug!(
+                    "Loaded {} skills from plugin '{}'",
+                    skills.len(),
+                    plugin.manifest.name
+                );
+                plugin_skills.extend(skills);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load skills for plugin '{}': {}",
+                    plugin.manifest.name,
+                    e
+                );
+            }
+        }
+    }
+
+    (plugins, plugin_skills)
 }
 

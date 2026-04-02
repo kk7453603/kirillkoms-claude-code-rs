@@ -1,5 +1,7 @@
 use std::path::Path;
 
+pub use crate::plugin::LoadedPlugin;
+
 #[derive(Debug, Clone)]
 pub struct SkillDefinition {
     pub name: String,
@@ -62,6 +64,18 @@ pub fn load_skills_from_dir(dir: &Path) -> Result<Vec<SkillDefinition>, SkillErr
     }
 
     skills.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(skills)
+}
+
+/// Load skills from a plugin's `skills/` subdirectory, marking them as Plugin source.
+///
+/// Delegates to `load_skills_from_dir` and then sets `source = SkillSource::Plugin`.
+pub fn load_plugin_skills(plugin: &LoadedPlugin) -> Result<Vec<SkillDefinition>, SkillError> {
+    let skills_dir = plugin.path.join("skills");
+    let mut skills = load_skills_from_dir(&skills_dir)?;
+    for skill in &mut skills {
+        skill.source = SkillSource::Plugin;
+    }
     Ok(skills)
 }
 
@@ -318,5 +332,64 @@ mod tests {
         let content = "---\nname: test\nno closing marker";
         let (name, _, _) = parse_frontmatter(content, "fallback");
         assert_eq!(name, "fallback"); // falls back because no closing ---
+    }
+
+    #[test]
+    fn test_load_plugin_skills_sets_plugin_source() {
+        use crate::plugin::{LoadedPlugin, PluginCommand, PluginManifest};
+
+        let dir = tempfile::tempdir().unwrap();
+
+        // Create a plugin directory structure
+        let plugin_dir = dir.path().join("test-plugin");
+        let skills_dir = plugin_dir.join("skills");
+        fs::create_dir_all(&skills_dir).unwrap();
+        fs::write(skills_dir.join("tool.md"), "# Tool Skill\nDoes something.").unwrap();
+
+        let manifest = PluginManifest {
+            name: "test-plugin".to_string(),
+            version: "1.0.0".to_string(),
+            description: Some("A test plugin".to_string()),
+            commands: vec![PluginCommand {
+                name: "run".to_string(),
+                description: "Run it".to_string(),
+            }],
+            hooks: None,
+        };
+        let plugin = LoadedPlugin {
+            manifest,
+            path: plugin_dir,
+            enabled: true,
+        };
+
+        let skills = super::load_plugin_skills(&plugin).unwrap();
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].source, SkillSource::Plugin);
+        assert_eq!(skills[0].name, "tool");
+    }
+
+    #[test]
+    fn test_load_plugin_skills_no_skills_dir() {
+        use crate::plugin::{LoadedPlugin, PluginManifest};
+
+        let dir = tempfile::tempdir().unwrap();
+        let plugin_dir = dir.path().join("empty-plugin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+
+        let manifest = PluginManifest {
+            name: "empty-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            description: None,
+            commands: vec![],
+            hooks: None,
+        };
+        let plugin = LoadedPlugin {
+            manifest,
+            path: plugin_dir,
+            enabled: true,
+        };
+
+        let skills = super::load_plugin_skills(&plugin).unwrap();
+        assert!(skills.is_empty());
     }
 }
