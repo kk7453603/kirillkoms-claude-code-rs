@@ -125,8 +125,15 @@ impl QueryEngine {
                     full_text.push_str(&text);
                     got_response = true;
                 }
-                QueryEvent::ToolUseStart { ref id, ref name } => {
-                    self.persist_entry("tool_use", serde_json::json!({ "id": id, "name": name }));
+                QueryEvent::ToolUseStart {
+                    ref id,
+                    ref name,
+                    ref input,
+                } => {
+                    self.persist_entry(
+                        "tool_use",
+                        serde_json::json!({ "id": id, "name": name, "input": input }),
+                    );
                 }
                 QueryEvent::ToolResult {
                     ref id,

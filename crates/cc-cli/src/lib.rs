@@ -23,8 +23,8 @@ pub struct CliArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
-    /// Resume a previous session
-    #[arg(long)]
+    /// Resume a previous session (pass session ID, or omit to list recent sessions)
+    #[arg(long, num_args = 0..=1, default_missing_value = "")]
     pub resume: Option<String>,
 
     /// Working directory

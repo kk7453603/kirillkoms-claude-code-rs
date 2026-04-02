@@ -53,7 +53,9 @@ clap = { version = "4", features = ["derive", "env", "string"] }
 
 # TUI
 ratatui = "0.29"
-crossterm = "0.28"
+crossterm = { version = "0.28", features = ["event-stream"] }
+pulldown-cmark = "0.12"
+syntect = { version = "5", default-features = false, features = ["default-fancy"] }
 
 # Logging/Tracing
 tracing = "0.1"

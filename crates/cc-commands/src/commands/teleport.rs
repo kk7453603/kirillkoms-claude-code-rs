@@ -41,6 +41,14 @@ pub static TELEPORT: CommandDef = CommandDef {
             // Canonicalize the path
             let canonical = resolved.canonicalize().unwrap_or(resolved);
 
+            if let Err(e) = std::env::set_current_dir(&canonical) {
+                return Ok(CommandOutput::message(&format!(
+                    "Failed to change directory to {}: {}",
+                    canonical.display(),
+                    e
+                )));
+            }
+
             Ok(CommandOutput::message(&format!(
                 "Working directory changed to: {}",
                 canonical.display()

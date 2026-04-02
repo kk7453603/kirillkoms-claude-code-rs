@@ -26,7 +26,14 @@ pub fn load_resume_data(
     for entry in &entries {
         match entry.entry_type.as_str() {
             "user_message" | "assistant_message" => {
-                messages.push(entry.data.clone());
+                let mut msg = entry.data.clone();
+                if let Some(obj) = msg.as_object_mut() {
+                    obj.insert(
+                        "_role".to_string(),
+                        serde_json::Value::String(entry.entry_type.clone()),
+                    );
+                }
+                messages.push(msg);
             }
             "session_start" => {
                 if let Some(root) = entry.data.get("project_root").and_then(|v| v.as_str()) {

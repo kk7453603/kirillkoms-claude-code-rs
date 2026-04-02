@@ -7,13 +7,27 @@ edition.workspace = true
 cc-types = { workspace = true }
 cc-tools = { workspace = true }
 cc-config = { workspace = true }
+cc-engine = { workspace = true }
+cc-cost = { workspace = true }
+cc-commands = { workspace = true }
+cc-api = { workspace = true }
+cc-session = { workspace = true }
+cc-skills = { workspace = true }
+cc-mcp = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
+pulldown-cmark = { workspace = true }
+syntect = { workspace = true }
 tokio = { workspace = true }
+futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+chrono = { workspace = true }
 unicode-width = "0.2"
 
 [dev-dependencies]

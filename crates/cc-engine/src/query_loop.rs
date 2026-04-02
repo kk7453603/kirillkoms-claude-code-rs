@@ -21,7 +21,12 @@ pub enum QueryEvent {
     /// Thinking content
     ThinkingDelta(String),
     /// Tool use started
-    ToolUseStart { id: String, name: String },
+    ToolUseStart {
+        id: String,
+        name: String,
+        /// Full input JSON for the tool call (available once the block is complete).
+        input: serde_json::Value,
+    },
     /// Tool result
     ToolResult {
         id: String,
@@ -181,12 +186,13 @@ pub fn query(mut params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                                     }
                                     StreamEvent::ContentBlockStop { index } => {
                                         // Peek at tool_use blocks to yield ToolUseStart
-                                        if let Some(ContentBlock::ToolUse { id, name, .. }) =
+                                        if let Some(ContentBlock::ToolUse { id, name, input }) =
                                             state.content_blocks.get(*index)
                                         {
                                             yield QueryEvent::ToolUseStart {
                                                 id: id.clone(),
                                                 name: name.clone(),
+                                                input: input.clone(),
                                             };
                                         }
                                     }
@@ -409,6 +415,7 @@ mod tests {
         let _e3 = QueryEvent::ToolUseStart {
             id: "tu_1".to_string(),
             name: "Bash".to_string(),
+            input: serde_json::json!({"command": "ls"}),
         };
         let _e4 = QueryEvent::ToolResult {
             id: "tu_1".to_string(),
@@ -437,12 +444,14 @@ mod tests {
         let event = QueryEvent::ToolUseStart {
             id: "tu_1".to_string(),
             name: "Read".to_string(),
+            input: serde_json::json!({"file_path": "/tmp/foo.rs"}),
         };
         let cloned = event.clone();
         match cloned {
-            QueryEvent::ToolUseStart { id, name } => {
+            QueryEvent::ToolUseStart { id, name, input } => {
                 assert_eq!(id, "tu_1");
                 assert_eq!(name, "Read");
+                assert_eq!(input["file_path"], "/tmp/foo.rs");
             }
             _ => panic!("expected ToolUseStart"),
         }

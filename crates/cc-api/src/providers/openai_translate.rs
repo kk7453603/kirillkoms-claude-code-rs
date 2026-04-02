@@ -306,6 +306,7 @@ pub(crate) struct StreamTranslationState {
     message_started: bool,
     current_content_index: usize,
     text_block_started: bool,
+    thinking_block_started: bool,
     /// Tracks active tool calls by their OpenAI-side index.
     active_tool_calls: HashMap<usize, ToolCallAccumulator>,
     model: String,
@@ -324,6 +325,7 @@ impl StreamTranslationState {
             message_started: false,
             current_content_index: 0,
             text_block_started: false,
+            thinking_block_started: false,
             active_tool_calls: HashMap::new(),
             model: String::new(),
             accumulated_usage: None,
@@ -367,14 +369,37 @@ pub(crate) fn translate_stream_chunk(
     };
 
     if let Some(delta) = &choice.delta {
-        // Handle text content (with reasoning fallback for thinking models)
-        let effective_text = delta
-            .content
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .or(delta.reasoning.as_deref().filter(|s| !s.is_empty()));
+        // Handle reasoning/thinking content (separate from text)
+        if let Some(reasoning) = delta.reasoning.as_deref().filter(|s| !s.is_empty()) {
+            if !state.thinking_block_started {
+                state.thinking_block_started = true;
+                events.push(StreamEvent::ContentBlockStart {
+                    index: state.current_content_index,
+                    content_block: ContentBlock::Thinking {
+                        thinking: String::new(),
+                        signature: None,
+                    },
+                });
+            }
+            events.push(StreamEvent::ContentBlockDelta {
+                index: state.current_content_index,
+                delta: ContentDelta::ThinkingDelta {
+                    thinking: reasoning.to_string(),
+                },
+            });
+        }
 
-        if let Some(text) = effective_text {
+        // Handle text content
+        if let Some(text) = delta.content.as_deref().filter(|s| !s.is_empty()) {
+            // Close thinking block if open and text starts
+            if state.thinking_block_started {
+                events.push(StreamEvent::ContentBlockStop {
+                    index: state.current_content_index,
+                });
+                state.current_content_index += 1;
+                state.thinking_block_started = false;
+            }
+
             if !state.text_block_started {
                 state.text_block_started = true;
                 events.push(StreamEvent::ContentBlockStart {
@@ -398,7 +423,15 @@ pub(crate) fn translate_stream_chunk(
                 let tc_index = tc_delta.index;
 
                 if !state.active_tool_calls.contains_key(&tc_index) {
-                    // New tool call starting — close text block if open
+                    // New tool call starting — close thinking block if open
+                    if state.thinking_block_started {
+                        events.push(StreamEvent::ContentBlockStop {
+                            index: state.current_content_index,
+                        });
+                        state.current_content_index += 1;
+                        state.thinking_block_started = false;
+                    }
+                    // Close text block if open
                     if state.text_block_started {
                         events.push(StreamEvent::ContentBlockStop {
                             index: state.current_content_index,
@@ -471,6 +504,15 @@ pub(crate) fn translate_stream_chunk(
 
     // Handle finish
     if let Some(ref finish_reason) = choice.finish_reason {
+        // Close any open thinking block
+        if state.thinking_block_started {
+            events.push(StreamEvent::ContentBlockStop {
+                index: state.current_content_index,
+            });
+            state.current_content_index += 1;
+            state.thinking_block_started = false;
+        }
+
         // Close any open text block
         if state.text_block_started {
             events.push(StreamEvent::ContentBlockStop {
@@ -1638,15 +1680,19 @@ mod tests {
             &mut state,
         );
 
-        // Should produce ContentBlockStart + TextDelta from reasoning
+        // Should produce ContentBlockStart (Thinking) + ThinkingDelta from reasoning
         assert_eq!(events.len(), 2);
-        assert!(matches!(&events[0], StreamEvent::ContentBlockStart { .. }));
-        match &events[1] {
-            StreamEvent::ContentBlockDelta { delta: ContentDelta::TextDelta { text }, .. } => {
-                assert_eq!(text, "Let me think about this...");
-            }
-            _ => panic!("expected TextDelta from reasoning fallback"),
+        match &events[0] {
+            StreamEvent::ContentBlockStart { content_block: ContentBlock::Thinking { .. }, .. } => {}
+            other => panic!("expected Thinking ContentBlockStart, got {:?}", other),
         }
-        assert!(state.text_block_started);
+        match &events[1] {
+            StreamEvent::ContentBlockDelta { delta: ContentDelta::ThinkingDelta { thinking }, .. } => {
+                assert_eq!(thinking, "Let me think about this...");
+            }
+            other => panic!("expected ThinkingDelta from reasoning, got {:?}", other),
+        }
+        assert!(state.thinking_block_started);
+        assert!(!state.text_block_started);
     }
 }

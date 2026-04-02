@@ -26,6 +26,11 @@ impl Spinner {
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    /// Get the current spinner frame character without advancing.
+    pub fn frame(&self) -> &str {
+        self.frames[self.current]
+    }
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use cc_mcp::client::{McpClient, StdioMcpClient};
+use cc_mcp::types::McpToolDefinition;
 
 use crate::trait_def::{SearchReadInfo, Tool, ToolError, ToolResult, ValidationResult};
 
@@ -297,6 +298,101 @@ impl Tool for ReadMcpResourceTool {
         let json_str = serde_json::to_string_pretty(&result)
             .unwrap_or_else(|_| "Error serializing resource".to_string());
         Ok(ToolResult::text(&json_str))
+    }
+}
+
+// ──────────────── McpDynamicTool ────────────────
+
+/// A dynamic tool that wraps a single MCP server tool.
+///
+/// Instances are created at startup for each tool exposed by each connected
+/// MCP server.  The tool name uses the normalized form `mcp__<server>__<tool>`.
+pub struct McpDynamicTool {
+    /// Normalized tool name: `mcp__<server>__<tool>`
+    normalized_name: String,
+    /// Raw MCP tool name (as reported by the server)
+    raw_tool_name: String,
+    /// Tool definition (description + input schema) from the server
+    definition: McpToolDefinition,
+    /// Connected client for this server
+    client: Arc<StdioMcpClient>,
+}
+
+impl McpDynamicTool {
+    pub fn new(
+        server_name: &str,
+        definition: McpToolDefinition,
+        client: Arc<StdioMcpClient>,
+    ) -> Self {
+        let normalized_name =
+            cc_mcp::normalization::normalize_tool_name(server_name, &definition.name);
+        let raw_tool_name = definition.name.clone();
+        Self {
+            normalized_name,
+            raw_tool_name,
+            definition,
+            client,
+        }
+    }
+}
+
+#[async_trait]
+impl Tool for McpDynamicTool {
+    fn name(&self) -> &str {
+        &self.normalized_name
+    }
+
+    fn input_schema(&self) -> Value {
+        self.definition.input_schema.clone()
+    }
+
+    fn description(&self) -> String {
+        self.definition.description.clone()
+    }
+
+    fn is_read_only(&self, _input: &Value) -> bool {
+        // MCP tools are treated as non-read-only (conservative default)
+        false
+    }
+
+    fn is_concurrency_safe(&self, _input: &Value) -> bool {
+        false
+    }
+
+    async fn call(&self, input: Value) -> Result<ToolResult, ToolError> {
+        let result = self
+            .client
+            .call_tool(&self.raw_tool_name, input)
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                message: format!("MCP tool '{}' failed: {}", self.normalized_name, e),
+            })?;
+
+        if result.is_error {
+            Ok(ToolResult::error(
+                &result
+                    .content
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| result.content.to_string()),
+            ))
+        } else {
+            let text = match &result.content {
+                Value::String(s) => s.clone(),
+                Value::Array(arr) => {
+                    // MCP content array: each item may have type/text
+                    arr.iter()
+                        .filter_map(|item| {
+                            item.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                }
+                other => serde_json::to_string_pretty(other)
+                    .unwrap_or_else(|_| other.to_string()),
+            };
+            Ok(ToolResult::text(&text))
+        }
     }
 }
 

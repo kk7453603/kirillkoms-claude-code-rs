@@ -8,8 +8,6 @@ pub static CLEAR: CommandDef = CommandDef {
     hidden: false,
     handler: |_args| {
         Box::pin(async {
-            // Send ANSI escape codes to clear terminal and move cursor to top-left
-            print!("\x1B[2J\x1B[1;1H");
             Ok(CommandOutput::message("Conversation cleared."))
         })
     },
