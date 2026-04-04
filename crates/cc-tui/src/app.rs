@@ -26,6 +26,8 @@ pub enum ContentBlock {
         input_summary: String,
         result: Option<ToolResultInfo>,
         collapsed: bool,
+        /// For Edit tool: (old_string, new_string) diff data.
+        diff_data: Option<(String, String)>,
     },
 }
 
@@ -54,6 +56,8 @@ pub struct ActiveTool {
     pub started_at: Instant,
     /// Short summary of the key argument (command, file_path, pattern, etc.).
     pub input_summary: String,
+    /// For Edit tool: (old_string, new_string) diff data.
+    pub diff_data: Option<(String, String)>,
 }
 
 /// Session metadata shown in the banner.
@@ -195,6 +199,9 @@ pub struct App {
     // Permission
     pub pending_permission: Option<PendingPermission>,
 
+    // /btw overlay
+    pub btw_overlay: Option<String>,
+
     // Slash-command completion
     pub command_completions: Vec<String>,
     pub completion_labels: Vec<String>,
@@ -232,6 +239,7 @@ impl App {
             usage: UsageInfo::default(),
             scroll: ScrollState::default(),
             pending_permission: None,
+            btw_overlay: None,
             command_completions: Vec::new(),
             completion_labels: Vec::new(),
             completion_index: None,
@@ -267,11 +275,19 @@ impl App {
         self.flush_streaming_text();
 
         let input_summary = extract_input_summary(name, input);
+        let diff_data = if name == "Edit" {
+            let old = input.get("old_string").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let new = input.get("new_string").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            Some((old, new))
+        } else {
+            None
+        };
         self.active_tool = Some(ActiveTool {
             id: id.to_string(),
             name: name.to_string(),
             started_at: Instant::now(),
             input_summary: input_summary.clone(),
+            diff_data,
         });
         if input_summary.is_empty() {
             self.spinner.set_message(&format!("Running {}...", name));
@@ -299,6 +315,8 @@ impl App {
                 None
             };
 
+            let diff_data = tool.diff_data.clone();
+
             self.ensure_assistant_message();
             if let Some(msg) = self.messages.last_mut() {
                 msg.blocks.push(ContentBlock::ToolUse {
@@ -310,6 +328,7 @@ impl App {
                         file_path,
                     }),
                     collapsed: true,
+                    diff_data,
                 });
             }
         }
@@ -418,6 +437,12 @@ impl App {
         // Ctrl+C always quits
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return AppAction::Quit;
+        }
+
+        // Any keypress dismisses the /btw overlay
+        if self.btw_overlay.is_some() {
+            self.btw_overlay = None;
+            return AppAction::Continue;
         }
 
         match self.mode {

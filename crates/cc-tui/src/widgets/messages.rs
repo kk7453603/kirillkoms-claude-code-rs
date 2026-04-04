@@ -164,13 +164,12 @@ fn render_message(
                         _ => theme.assistant_msg_color,
                     };
                     for line_str in text.lines() {
-                        lines.push(Line::from(Span::styled(
-                            truncate_to_width(
-                                &format!("  {}", line_str),
-                                max_width,
-                            ),
-                            Style::default().fg(color),
-                        )));
+                        for wrapped in wrap_text(&format!("  {}", line_str), max_width) {
+                            lines.push(Line::from(Span::styled(
+                                wrapped,
+                                Style::default().fg(color),
+                            )));
+                        }
                     }
                 }
             }
@@ -200,6 +199,7 @@ fn render_message(
                 input_summary,
                 result,
                 collapsed,
+                diff_data,
             } => {
                 let status = match result {
                     Some(r) if r.is_error => {
@@ -245,11 +245,36 @@ fn render_message(
                 ]));
 
                 if !collapsed && let Some(r) = result {
-                    for line_str in r.summary.lines().take(10) {
-                        lines.push(Line::from(Span::styled(
-                            truncate_to_width(&format!("    {}", line_str), max_width),
-                            Style::default().fg(theme.dim_color),
-                        )));
+                    if let Some((old, new)) = diff_data {
+                        let diff_view = crate::diff_view::DiffView::new(old, new);
+                        let diff_lines = diff_view.unified_diff_lines();
+                        for diff_line in diff_lines.iter().take(20) {
+                            use crate::diff_view::DiffLine;
+                            let (prefix, content, color) = match diff_line {
+                                DiffLine::Added(s) => ("+", s.as_str(), Color::Green),
+                                DiffLine::Removed(s) => ("-", s.as_str(), Color::Red),
+                                DiffLine::Context(s) => (" ", s.as_str(), theme.dim_color),
+                                DiffLine::Header(s) => ("@", s.as_str(), theme.dim_color),
+                            };
+                            let modifier = match diff_line {
+                                DiffLine::Context(_) | DiffLine::Header(_) => Modifier::DIM,
+                                _ => Modifier::empty(),
+                            };
+                            lines.push(Line::from(Span::styled(
+                                truncate_to_width(
+                                    &format!("    {}{}", prefix, content),
+                                    max_width,
+                                ),
+                                Style::default().fg(color).add_modifier(modifier),
+                            )));
+                        }
+                    } else {
+                        for line_str in r.summary.lines().take(10) {
+                            lines.push(Line::from(Span::styled(
+                                truncate_to_width(&format!("    {}", line_str), max_width),
+                                Style::default().fg(theme.dim_color),
+                            )));
+                        }
                     }
                 }
             }
@@ -274,6 +299,46 @@ fn truncate_to_width(s: &str, max_chars: usize) -> String {
         end = i + ch.len_utf8();
     }
     s[..end].to_string()
+}
+
+/// Wrap text at word boundaries to fit within max_width.
+/// Returns multiple lines if the text is too long.
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![String::new()];
+    }
+    let display_width = |s: &str| -> usize {
+        s.chars()
+            .map(|c| unicode_width::UnicodeWidthChar::width(c).unwrap_or(1))
+            .sum()
+    };
+
+    if display_width(text) <= max_width {
+        return vec![text.to_string()];
+    }
+
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut current_width = 0;
+
+    for word in text.split_inclusive(|c: char| c.is_whitespace()) {
+        let word_width = display_width(word);
+        if current_width + word_width > max_width && !current.is_empty() {
+            result.push(current.trim_end().to_string());
+            current = format!("  {}", word.trim_start()); // indent continuation
+            current_width = display_width(&current);
+        } else {
+            current.push_str(word);
+            current_width += word_width;
+        }
+    }
+    if !current.is_empty() {
+        result.push(current);
+    }
+    if result.is_empty() {
+        result.push(text.to_string());
+    }
+    result
 }
 
 #[cfg(test)]

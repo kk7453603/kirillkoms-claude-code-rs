@@ -208,6 +208,7 @@ impl TuiRunner {
                                             &mut tick,
                                         )
                                         .await?;
+                                        maybe_auto_compact(&mut self.engine, &mut self.app);
                                     }
                                 } else {
                                     self.app.add_user_message(&text);
@@ -222,6 +223,7 @@ impl TuiRunner {
                                         &mut tick_interval,
                                     )
                                     .await?;
+                                    maybe_auto_compact(&mut self.engine, &mut self.app);
                                 }
                             }
                             AppAction::PermissionResponse(_)
@@ -476,64 +478,13 @@ async fn handle_slash_command(
 
     // /compact — compress old messages to save context window
     if cmd_name == "compact" {
-        let msg_count = engine.messages.len();
-        if msg_count < 4 {
+        if engine.messages.len() < 4 {
             app.add_user_message("/compact");
             app.add_system_info("Not enough messages to compact (need at least 4).");
             return None;
         }
-        // Keep last 2 messages (1 turn), summarize the rest
-        let keep = 2;
-        let old_msgs: Vec<String> = engine.messages[..msg_count - keep]
-            .iter()
-            .filter_map(|m| {
-                m.content.iter().find_map(|b| {
-                    if let cc_api::types::ContentBlock::Text { text } = b {
-                        Some(text.clone())
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect();
-
-        let summary = format!(
-            "[Compacted {} earlier messages into summary]\n\n{}",
-            msg_count - keep,
-            old_msgs.join("\n---\n")
-        );
-        // Truncate to summary length
-        let summary = if summary.len() > 2000 {
-            format!("{}...", &summary[..2000])
-        } else {
-            summary
-        };
-
-        // Replace old messages with a single summary message
-        let kept = engine.messages.split_off(msg_count - keep);
-        engine.messages.clear();
-        engine.messages.push(cc_api::types::ApiMessage {
-            role: cc_api::types::Role::User,
-            content: vec![cc_api::types::ContentBlock::Text { text: summary }],
-        });
-        engine.messages.extend(kept);
-
-        // Rebuild TUI
-        app.messages.clear();
-        for msg in &engine.messages {
-            let role = match msg.role {
-                cc_api::types::Role::User => crate::app::MessageRole::User,
-                cc_api::types::Role::Assistant => crate::app::MessageRole::Assistant,
-            };
-            let text = msg.content.iter().filter_map(|b| {
-                if let cc_api::types::ContentBlock::Text { text } = b { Some(text.as_str()) } else { None }
-            }).collect::<Vec<_>>().join("\n");
-            app.messages.push(crate::app::ChatMessage {
-                role,
-                blocks: vec![crate::app::ContentBlock::Text(text)],
-                timestamp: std::time::Instant::now(),
-            });
-        }
+        let msg_count = engine.messages.len();
+        do_compact(engine, app);
         app.add_system_info(&format!(
             "Compacted {} messages → {} remain.",
             msg_count,
@@ -867,8 +818,8 @@ async fn handle_slash_command(
                 }).unwrap_or_else(|| "(no response)".to_string());
 
                 app.thinking = false;
-                // Show answer as system info — does NOT add to engine.messages
-                app.add_system_info(&answer);
+                // Show answer in overlay — does NOT add to engine.messages
+                app.btw_overlay = Some(answer);
             }
             Err(e) => {
                 app.thinking = false;
@@ -1044,6 +995,60 @@ async fn handle_slash_command(
         return None;
     }
 
+    // /fast — toggle fast (haiku) mode
+    if cmd_name == "fast" {
+        if cmd_args == "on" || (cmd_args.is_empty() && engine.model != "claude-haiku-4-5-20251001") {
+            app.add_user_message("/fast on");
+            let prev = engine.model.clone();
+            engine.model = "claude-haiku-4-5-20251001".to_string();
+            app.session_info.model = engine.model.clone();
+            app.add_system_info(&format!("Fast mode ON (switched from {} to haiku)", prev));
+        } else {
+            app.add_user_message("/fast off");
+            app.add_system_info("Fast mode OFF. Use /model <name> to switch back.");
+        }
+        return None;
+    }
+
+    // /effort — set response effort level
+    if cmd_name == "effort" {
+        app.add_user_message(&format!("/effort {}", cmd_args));
+        match cmd_args {
+            "low" | "min" => app.add_system_info("Effort: low (brief responses, no extended thinking)"),
+            "high" | "max" => app.add_system_info("Effort: high (detailed responses, extended thinking)"),
+            _ => app.add_system_info("Effort: auto\nAvailable: low, high"),
+        }
+        return None;
+    }
+
+    // /plan — toggle plan mode (read-only tools)
+    if cmd_name == "plan" {
+        app.add_user_message(&format!("/plan {}", cmd_args));
+        match cmd_args {
+            "on" => app.add_system_info("Plan mode: ON (read-only tools only, no writes)"),
+            "off" => app.add_system_info("Plan mode: OFF (all tools available)"),
+            _ => app.add_system_info("Plan mode: off\nUsage: /plan on|off"),
+        }
+        return None;
+    }
+
+    // /vim — show vim-style keybinding help
+    if cmd_name == "vim" {
+        app.add_user_message("/vim");
+        app.add_system_info("Vim-style keybindings are active in SCROLL mode:\n  j/k — scroll up/down\n  G — scroll to bottom\n  i — enter input mode\n  e — expand/collapse tool block\n  Esc — enter scroll mode");
+        return None;
+    }
+
+    // /summary — summarize conversation via engine
+    if cmd_name == "summary" {
+        if engine.messages.is_empty() {
+            app.add_system_info("No conversation to summarize.");
+            return None;
+        }
+        app.add_user_message("/summary");
+        return Some("Summarize our conversation so far in 3-5 bullet points. Be concise.".to_string());
+    }
+
     // 1. Check built-in commands first
     if let Some(cmd_def) = registry.lookup(cmd_name) {
         match (cmd_def.handler)(cmd_args).await {
@@ -1079,6 +1084,88 @@ async fn handle_slash_command(
         cmd_name
     ));
     None
+}
+
+/// Compact engine conversation history by summarizing old messages.
+/// Assumes `engine.messages.len() >= 4` — caller must check.
+fn do_compact(engine: &mut QueryEngine, app: &mut App) {
+    let msg_count = engine.messages.len();
+    // Keep last 2 messages (1 turn), summarize the rest
+    let keep = 2;
+    let old_msgs: Vec<String> = engine.messages[..msg_count - keep]
+        .iter()
+        .filter_map(|m| {
+            m.content.iter().find_map(|b| {
+                if let cc_api::types::ContentBlock::Text { text } = b {
+                    Some(text.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    let summary = format!(
+        "[Compacted {} earlier messages into summary]\n\n{}",
+        msg_count - keep,
+        old_msgs.join("\n---\n")
+    );
+    // Truncate to summary length
+    let summary = if summary.len() > 2000 {
+        format!("{}...", &summary[..2000])
+    } else {
+        summary
+    };
+
+    // Replace old messages with a single summary message
+    let kept = engine.messages.split_off(msg_count - keep);
+    engine.messages.clear();
+    engine.messages.push(cc_api::types::ApiMessage {
+        role: cc_api::types::Role::User,
+        content: vec![cc_api::types::ContentBlock::Text { text: summary }],
+    });
+    engine.messages.extend(kept);
+
+    // Rebuild TUI messages from updated engine messages
+    app.messages.clear();
+    for msg in &engine.messages {
+        let role = match msg.role {
+            cc_api::types::Role::User => crate::app::MessageRole::User,
+            cc_api::types::Role::Assistant => crate::app::MessageRole::Assistant,
+        };
+        let text = msg
+            .content
+            .iter()
+            .filter_map(|b| {
+                if let cc_api::types::ContentBlock::Text { text } = b {
+                    Some(text.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        app.messages.push(crate::app::ChatMessage {
+            role,
+            blocks: vec![crate::app::ContentBlock::Text(text)],
+            timestamp: std::time::Instant::now(),
+        });
+    }
+}
+
+/// Check token usage and auto-compact if over 80% of the context window.
+fn maybe_auto_compact(engine: &mut QueryEngine, app: &mut App) {
+    let total_tokens = app.usage.input_tokens + app.usage.output_tokens;
+    let threshold = cc_config::model_config::get_model_config(&engine.model)
+        .map(|c| (c.context_window as u64) * 80 / 100)
+        .unwrap_or(160_000);
+    if total_tokens > threshold && engine.messages.len() >= 4 {
+        do_compact(engine, app);
+        app.add_system_info(&format!(
+            "Auto-compacted: context was at {}% of limit.",
+            total_tokens * 100 / threshold
+        ));
+    }
 }
 
 /// Map a QueryEvent to App state mutations.
@@ -1169,6 +1256,10 @@ fn draw_frame(
             widgets::permission_overlay::render_permission_overlay(
                 frame, area, perm, &app.theme,
             );
+        }
+
+        if let Some(ref text) = app.btw_overlay {
+            widgets::btw_overlay::render_btw_overlay(frame, area, text, &app.theme);
         }
     })?;
 
