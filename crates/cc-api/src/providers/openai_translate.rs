@@ -311,6 +311,9 @@ pub(crate) struct StreamTranslationState {
     active_tool_calls: HashMap<usize, ToolCallAccumulator>,
     model: String,
     accumulated_usage: Option<ChatUsage>,
+    /// Buffer for reasoning content — checked for tool call JSON at stream end
+    /// (workaround for Ollama/gemma4 streaming bug where tool calls land in reasoning field).
+    reasoning_buffer: String,
 }
 
 struct ToolCallAccumulator {
@@ -329,6 +332,7 @@ impl StreamTranslationState {
             active_tool_calls: HashMap::new(),
             model: String::new(),
             accumulated_usage: None,
+            reasoning_buffer: String::new(),
         }
     }
 }
@@ -387,6 +391,8 @@ pub(crate) fn translate_stream_chunk(
                     thinking: reasoning.to_string(),
                 },
             });
+            // Also buffer reasoning for tool call extraction at stream end
+            state.reasoning_buffer.push_str(reasoning);
         }
 
         // Handle text content
@@ -533,6 +539,17 @@ pub(crate) fn translate_stream_chunk(
             }
         }
 
+        // Workaround: Ollama/gemma4 streaming puts tool calls in reasoning field.
+        // If no tool calls were found via normal path, try parsing reasoning buffer.
+        if state.active_tool_calls.is_empty() && !state.reasoning_buffer.is_empty() {
+            if let Some(tool_events) = try_parse_tool_calls_from_reasoning(
+                &state.reasoning_buffer,
+                &mut state.current_content_index,
+            ) {
+                events.extend(tool_events);
+            }
+        }
+
         // Build usage from accumulated data
         let usage = state.accumulated_usage.take().map(|u| Usage {
             input_tokens: u.prompt_tokens,
@@ -552,6 +569,98 @@ pub(crate) fn translate_stream_chunk(
     }
 
     events
+}
+
+/// Try to extract tool calls from reasoning buffer text.
+/// Workaround for Ollama/gemma4 bug where streaming puts tool_calls in reasoning field.
+/// Returns None if reasoning doesn't contain valid tool call JSON.
+/// Safe for other providers: regular thinking text won't match the structure.
+fn try_parse_tool_calls_from_reasoning(
+    reasoning: &str,
+    content_index: &mut usize,
+) -> Option<Vec<StreamEvent>> {
+    let trimmed = reasoning.trim();
+
+    // Try to parse as a single tool call object: {"name": "...", "arguments": {...}}
+    // Or as an array of tool calls
+    let tool_calls: Vec<serde_json::Value> =
+        if let Ok(obj) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            if obj.get("name").is_some() && obj.get("arguments").is_some() {
+                vec![obj]
+            } else if let Some(arr) = obj.as_array() {
+                arr.iter()
+                    .filter(|v| v.get("name").is_some())
+                    .cloned()
+                    .collect()
+            } else {
+                return None;
+            }
+        } else {
+            // Try to find JSON object within reasoning text (may have surrounding text)
+            let start = trimmed.find('{');
+            let end = trimmed.rfind('}');
+            if let (Some(s), Some(e)) = (start, end) {
+                if s < e {
+                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&trimmed[s..=e]) {
+                        if obj.get("name").is_some() {
+                            vec![obj]
+                        } else {
+                            return None;
+                        }
+                    } else {
+                        return None;
+                    }
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        };
+
+    if tool_calls.is_empty() {
+        return None;
+    }
+
+    tracing::info!(
+        "Extracted {} tool call(s) from reasoning buffer (Ollama/gemma4 workaround)",
+        tool_calls.len()
+    );
+
+    let mut events = Vec::new();
+    for tc in tool_calls {
+        let name = tc
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let arguments = tc
+            .get("arguments")
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
+        let id = format!("reasoning_tc_{}", *content_index);
+
+        events.push(StreamEvent::ContentBlockStart {
+            index: *content_index,
+            content_block: ContentBlock::ToolUse {
+                id: id.clone(),
+                name: name.clone(),
+                input: arguments.clone(),
+            },
+        });
+        events.push(StreamEvent::ContentBlockDelta {
+            index: *content_index,
+            delta: ContentDelta::InputJsonDelta {
+                partial_json: serde_json::to_string(&arguments).unwrap_or_default(),
+            },
+        });
+        events.push(StreamEvent::ContentBlockStop {
+            index: *content_index,
+        });
+        *content_index += 1;
+    }
+
+    Some(events)
 }
 
 #[cfg(test)]
