@@ -13,6 +13,7 @@ cc-commands = { workspace = true }
 cc-api = { workspace = true }
 cc-session = { workspace = true }
 cc-skills = { workspace = true }
+cc-permissions = { workspace = true }
 cc-mcp = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }

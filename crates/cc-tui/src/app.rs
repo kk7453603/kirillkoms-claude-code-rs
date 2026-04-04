@@ -182,6 +182,7 @@ pub struct App {
     pub input: TextInput,
     pub theme: Theme,
     pub should_quit: bool,
+    pub permission_mode: cc_permissions::modes::PermissionMode,
 
     // Conversation
     pub messages: Vec<ChatMessage>,
@@ -229,6 +230,7 @@ impl App {
             input: TextInput::new(),
             theme: Theme::default(),
             should_quit: false,
+            permission_mode: cc_permissions::modes::PermissionMode::Default,
             messages: Vec::new(),
             streaming_text: String::new(),
             streaming_thinking: String::new(),
@@ -437,6 +439,12 @@ impl App {
         // Ctrl+C always quits
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return AppAction::Quit;
+        }
+
+        // Shift+Tab cycles permission mode: Default → Plan → Auto → Default
+        if key.code == KeyCode::BackTab {
+            self.cycle_permission_mode();
+            return AppAction::Continue;
         }
 
         // Any keypress dismisses the /btw overlay
@@ -680,6 +688,30 @@ impl App {
     }
 
     /// Clear all completion state.
+    /// Cycle permission mode: Default → Plan → Auto → Default
+    fn cycle_permission_mode(&mut self) {
+        use cc_permissions::modes::PermissionMode;
+        self.permission_mode = match self.permission_mode {
+            PermissionMode::Default => PermissionMode::Plan,
+            PermissionMode::Plan => PermissionMode::Auto,
+            PermissionMode::Auto => PermissionMode::Default,
+            _ => PermissionMode::Default,
+        };
+    }
+
+    /// Display label for current permission mode.
+    pub fn permission_mode_label(&self) -> &'static str {
+        use cc_permissions::modes::PermissionMode;
+        match self.permission_mode {
+            PermissionMode::Default => "default",
+            PermissionMode::Plan => "plan",
+            PermissionMode::Auto => "auto",
+            PermissionMode::AcceptEdits => "accept-edits",
+            PermissionMode::BypassPermissions => "bypass",
+            PermissionMode::DontAsk => "yolo",
+        }
+    }
+
     fn clear_completions(&mut self) {
         self.command_completions.clear();
         self.completion_labels.clear();

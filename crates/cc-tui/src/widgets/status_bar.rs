@@ -11,6 +11,7 @@ pub fn render_status_bar(
     model: &str,
     usage: &UsageInfo,
     mode: AppMode,
+    permission_mode: &str,
     theme: &Theme,
 ) {
     let input_tokens = cc_cost::format::format_tokens(usage.input_tokens);
@@ -24,7 +25,7 @@ pub fn render_status_bar(
     };
 
     let left = format!(" {} | {}in {}out | {} ", model, input_tokens, output_tokens, cost);
-    let right = format!(" {} ", mode_indicator);
+    let right = format!(" {} | {} ", permission_mode, mode_indicator);
 
     let left_width = left.len() as u16;
     let right_width = right.len() as u16;
@@ -68,7 +69,7 @@ mod tests {
         let mut terminal = ratatui::Terminal::new(backend).unwrap();
         terminal
             .draw(|f| {
-                render_status_bar(f, f.area(), "opus", &usage, AppMode::Input, &theme);
+                render_status_bar(f, f.area(), "opus", &usage, AppMode::Input, "default", &theme);
             })
             .unwrap();
     }

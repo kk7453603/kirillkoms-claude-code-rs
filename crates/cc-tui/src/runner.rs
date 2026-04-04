@@ -170,6 +170,10 @@ impl TuiRunner {
                 maybe_event = self.event_stream.next() => {
                     if let Some(Ok(Event::Key(key))) = maybe_event {
                         let action = self.app.handle_key_event(key);
+                        // Sync permission mode to engine if changed (Shift+Tab)
+                        if let Some(ref mut ctx) = self.engine.execution_context {
+                            ctx.permission_ctx.mode = self.app.permission_mode;
+                        }
                         let cmd_names = self.command_names();
                         let arg_completions = self.arg_completions_for_input();
                         self.app.update_completions(&cmd_names, &arg_completions);
@@ -1259,6 +1263,7 @@ fn draw_frame(
             &app.session_info.model,
             &app.usage,
             app.mode,
+            app.permission_mode_label(),
             &app.theme,
         );
 

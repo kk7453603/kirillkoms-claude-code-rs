@@ -604,6 +604,7 @@ dependencies = [
  "cc-cost",
  "cc-engine",
  "cc-mcp",
+ "cc-permissions",
  "cc-session",
  "cc-skills",
  "cc-tools",
@@ -1912,6 +1913,10 @@ dependencies = [
  "security-framework-sys",
  "tempfile",
 ]
+
+[[package]]
+name = "new-crate-test"
+version = "1.0.0"
 
 [[package]]
 name = "nom"
