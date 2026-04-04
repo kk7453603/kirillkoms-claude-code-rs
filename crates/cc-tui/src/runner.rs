@@ -192,6 +192,9 @@ impl TuiRunner {
                                     if let Some(skill_prompt) = is_skill {
                                         self.app.add_user_message(&text);
                                         draw_frame(&mut self.terminal, &mut self.app)?;
+                                        // Limit tool turns for skills to prevent runaway
+                                        let saved_max_turns = self.engine.max_turns;
+                                        self.engine.max_turns = 5;
                                         let mut tick = tokio::time::interval(
                                             std::time::Duration::from_millis(50),
                                         );
@@ -208,6 +211,7 @@ impl TuiRunner {
                                             &mut tick,
                                         )
                                         .await?;
+                                        self.engine.max_turns = saved_max_turns;
                                         maybe_auto_compact(&mut self.engine, &mut self.app);
                                     }
                                 } else {
@@ -1070,7 +1074,13 @@ async fn handle_slash_command(
 
     // 2. Check skills
     if let Some(skill) = skills.iter().find(|s| s.name == cmd_name) {
-        let mut prompt = skill.prompt_template.clone();
+        let mut prompt = String::from(
+            "IMPORTANT: Execute ONLY the task described below. \
+             Do NOT create new files unless explicitly asked. \
+             Do NOT modify files unless the task requires it. \
+             Stay focused on the task.\n\n",
+        );
+        prompt.push_str(&skill.prompt_template);
         if !cmd_args.is_empty() {
             prompt.push_str("\n\nUser context: ");
             prompt.push_str(cmd_args);
