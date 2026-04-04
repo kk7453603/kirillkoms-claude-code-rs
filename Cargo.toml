@@ -19,6 +19,7 @@ members = [
     "crates/cc-utils",
     "crates/cc-compact",
     "crates/cc-analytics",
+    "crates/cc-multiagent",
 ]
 
 [workspace.package]
