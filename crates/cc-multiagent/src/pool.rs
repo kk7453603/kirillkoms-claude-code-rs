@@ -1,16 +1,14 @@
+use dashmap::DashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio::time::{interval, Duration};
-use async_trait::async_trait;
-use uuid::Uuid;
-use dashmap::DashMap;
-use crate::{
-    Agent, AgentConfig, AgentId, AgentState, AgentInstance, 
-    AgentCommand, AgentEvent, SharedContext, MultiAgentError, Result
-};
+use tracing::{error, info, warn};
+
+use crate::agent::{AgentCommand, AgentConfig, AgentEvent, AgentId, AgentInstance, AgentState};
+use crate::context::SharedContext;
+use crate::errors::{MultiAgentError, Result};
 use crate::router::MessageRouter;
-use tracing::{info, warn, error};
 
 #[derive(Debug, Clone)]
 pub struct PoolConfig {

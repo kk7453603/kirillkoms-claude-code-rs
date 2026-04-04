@@ -1,10 +1,12 @@
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use async_trait::async_trait;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use crate::{AgentId, Result, MultiAgentError};
+
+use crate::agent::AgentId;
+use crate::errors::Result;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {

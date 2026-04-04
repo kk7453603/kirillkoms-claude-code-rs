@@ -1,11 +1,15 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
-use tokio::net::{UnixListener, UnixStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use serde::{Deserialize, Serialize};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::{mpsc, RwLock};
+use tracing::{error, info};
 use uuid::Uuid;
-use crate::{AgentId, Result, MultiAgentError};
+
+use crate::agent::AgentId;
+use crate::errors::{MultiAgentError, Result};
 
 /// IPC protocol for agent communication
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,8 +83,6 @@ pub struct IpcClient {
     tx: mpsc::Sender<IpcMessage>,
     rx: mpsc::Receiver<IpcMessage>,
 }
-
-use std::collections::HashMap;
 
 impl IpcServer {
     pub fn new(
@@ -329,5 +331,3 @@ impl IpcClient {
         }
     }
 }
-
-use tracing::{info, error};

@@ -1,10 +1,10 @@
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use crate::AgentId;
+
+use crate::agent::AgentId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentMetrics {
