@@ -99,6 +99,12 @@ pub fn query(mut params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                 None
             };
 
+            let tool_choice = if use_native_tools && tools.is_some() {
+                Some(cc_api::types::ToolChoice::Auto)
+            } else {
+                None
+            };
+
             let request = MessagesRequest {
                 model: params.model.clone(),
                 messages: messages.clone(),
@@ -106,7 +112,7 @@ pub fn query(mut params: QueryParams) -> impl Stream<Item = QueryEvent> + Send {
                 max_tokens: Some(params.max_tokens),
                 temperature: None,
                 tools,
-                tool_choice: None,
+                tool_choice,
                 thinking: params.thinking.clone(),
                 stream: true,
                 metadata: None,
