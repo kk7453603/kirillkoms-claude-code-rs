@@ -11,6 +11,9 @@ pub mod metrics;
 pub mod pool;
 pub mod router;
 
+#[cfg(test)]
+mod test_utils;
+
 pub use agent::{Agent, AgentCommand, AgentConfig, AgentEvent, AgentId, AgentInstance, AgentState};
 pub use context::{ContextUpdate, SharedContext};
 pub use errors::{MultiAgentError, Result};

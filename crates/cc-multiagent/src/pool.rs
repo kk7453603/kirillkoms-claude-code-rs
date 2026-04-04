@@ -293,7 +293,7 @@ impl AgentPool {
     
     async fn create_agent_instance(&self, config: AgentConfig) -> Result<AgentInstance> {
         let (command_tx, mut command_rx) = mpsc::channel(100);
-        let (event_tx, mut event_rx) = mpsc::channel(100);
+        let (event_tx, _event_rx) = mpsc::channel(100);
         
         let agent = AgentInstance {
             config,
@@ -308,7 +308,6 @@ impl AgentPool {
         
         // Spawn command handler
         let agent_id = agent.config.id;
-        let agent_clone = Arc::new(agent.clone());
         
         tokio::spawn(async move {
             while let Some(cmd) = command_rx.recv().await {
