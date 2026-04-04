@@ -330,16 +330,50 @@ pub fn build_tool_definitions(registry: &ToolRegistry) -> Vec<ToolDefinition> {
 /// Used as fallback when the model does not support native function calling.
 fn build_text_tool_descriptions(registry: &ToolRegistry) -> String {
     let mut desc = String::from(
-        "You have access to these tools. To use a tool, respond with a JSON block:\n\n\
+        "# Tool Use Instructions\n\n\
+         IMPORTANT: You have access to tools. You MUST use them to complete tasks. \
+         Do NOT ask the user to run commands or paste files — use the tools yourself.\n\n\
+         To call a tool, include a fenced block with the tag `tool_call`:\n\n\
          ```tool_call\n\
-         {\"name\": \"tool_name\", \"arguments\": {\"key\": \"value\"}}\n\
+         {\"name\": \"Bash\", \"arguments\": {\"command\": \"ls -la\"}}\n\
          ```\n\n\
-         You may use multiple tool_call blocks in a single response.\n\n\
-         Available tools:\n",
+         Another example — reading a file:\n\n\
+         ```tool_call\n\
+         {\"name\": \"Read\", \"arguments\": {\"file_path\": \"/path/to/file.rs\"}}\n\
+         ```\n\n\
+         Rules:\n\
+         - You MUST use tools, not ask the user to do things manually\n\
+         - You may use multiple ```tool_call blocks in one response\n\
+         - After each tool call, you will receive the result and can continue\n\
+         - Always use Read to view files, Bash to run commands, Grep to search\n\n\
+         ## Available Tools\n\n",
     );
 
     for tool in registry.enabled_tools() {
-        desc.push_str(&format!("- **{}**: {}\n", tool.name(), tool.description()));
+        desc.push_str(&format!("### {}\n{}\n", tool.name(), tool.description()));
+        // Include parameter schema if available
+        let schema = tool.input_schema();
+        if let Some(props) = schema.get("properties").and_then(|v| v.as_object()) {
+            let required: Vec<&str> = schema
+                .get("required")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            desc.push_str("Parameters:\n");
+            for (key, val) in props {
+                let desc_text = val
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let req = if required.contains(&key.as_str()) {
+                    " (required)"
+                } else {
+                    ""
+                };
+                desc.push_str(&format!("  - `{}`{}: {}\n", key, req, desc_text));
+            }
+        }
+        desc.push('\n');
     }
 
     desc
@@ -851,6 +885,6 @@ Let me also check the directory.
         let reg = ToolRegistry::new();
         let desc = build_text_tool_descriptions(&reg);
         assert!(desc.contains("tool_call"));
-        assert!(desc.contains("Available tools:"));
+        assert!(desc.contains("Available Tools"));
     }
 }
