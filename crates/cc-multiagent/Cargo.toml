@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Kirill <kk7453603@github>"]
 description = "Multi-Agent Control Plane for Claude Code RS"
-license = "SBSL-1.0"
+license = "MIT"
 
 [dependencies]
 # Core async runtime

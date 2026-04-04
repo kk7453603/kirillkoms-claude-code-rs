@@ -227,7 +227,7 @@ enum Command {
 
 ## License
 
-Licensed under the Small Business Source License (SBSL) v1.0
+Licensed under the MIT License
 
 ## Contributing
 
